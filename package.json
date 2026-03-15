@@ -1,0 +1,94 @@
+{
+  "name": "backend-guard",
+  "version": "1.2.0",
+  "description": "All-in-one security middleware for Express.js and Fastify — helmet, cors, rate-limit, XSS protection, input validation, request logging & IP blacklist in a single config.",
+  "keywords": [
+    "express",
+    "security",
+    "middleware",
+    "helmet",
+    "cors",
+    "rate-limit",
+    "xss",
+    "validation",
+    "zod",
+    "joi",
+    "ip-blacklist",
+    "request-logging",
+    "backend-security"
+  ],
+  "homepage": "https://github.com/hopesf/backend-guard#readme",
+  "bugs": {
+    "url": "https://github.com/hopesf/backend-guard/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hopesf/backend-guard.git"
+  },
+  "license": "MIT",
+  "author": "Selim Gecin",
+  "type": "commonjs",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "peerDependencies": {
+    "express": ">=4.0.0",
+    "joi": ">=17.0.0",
+    "zod": ">=3.0.0",
+    "fastify": ">=4.0.0",
+    "fastify-plugin": ">=4.0.0",
+    "@fastify/helmet": ">=10.0.0",
+    "@fastify/cors": ">=8.0.0",
+    "@fastify/rate-limit": ">=8.0.0"
+  },
+  "peerDependenciesMeta": {
+    "zod": {
+      "optional": true
+    },
+    "joi": {
+      "optional": true
+    },
+    "fastify": {
+      "optional": true
+    },
+    "fastify-plugin": {
+      "optional": true
+    },
+    "@fastify/helmet": {
+      "optional": true
+    },
+    "@fastify/cors": {
+      "optional": true
+    },
+    "@fastify/rate-limit": {
+      "optional": true
+    }
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "express-rate-limit": "^8.3.1",
+    "helmet": "^8.1.0",
+    "xss": "^1.0.15"
+  },
+  "devDependencies": {
+    "@fastify/cors": "^11.2.0",
+    "@fastify/helmet": "^13.0.2",
+    "@fastify/rate-limit": "^10.3.0",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "fastify": "^5.8.2",
+    "fastify-plugin": "^5.1.0",
+    "typescript": "^5.9.3"
+  }
+}
