@@ -1,7 +1,7 @@
 {
   "name": "backend-guard",
-  "version": "1.2.0",
-  "description": "All-in-one security middleware for Express.js and Fastify — helmet, cors, rate-limit, XSS protection, input validation, request logging & IP blacklist in a single config.",
+  "version": "1.3.0",
+  "description": "All-in-one security middleware for Express.js, Fastify and NestJS — helmet, cors, rate-limit, XSS protection, input validation, request logging & IP blacklist in a single config.",
   "keywords": [
     "express",
     "security",
@@ -15,7 +15,10 @@
     "joi",
     "ip-blacklist",
     "request-logging",
-    "backend-security"
+    "backend-security",
+    "nestjs",
+    "nestjs-module",
+    "nestjs-security"
   ],
   "homepage": "https://github.com/hopesf/backend-guard#readme",
   "bugs": {
@@ -43,14 +46,17 @@
     "node": ">=16.0.0"
   },
   "peerDependencies": {
-    "express": ">=4.0.0",
-    "joi": ">=17.0.0",
-    "zod": ">=3.0.0",
-    "fastify": ">=4.0.0",
-    "fastify-plugin": ">=4.0.0",
-    "@fastify/helmet": ">=10.0.0",
-    "@fastify/cors": ">=8.0.0",
-    "@fastify/rate-limit": ">=8.0.0"
+    "@fastify/cors": "^8.0.0 || ^9.0.0 || ^10.0.0 || ^11.0.0",
+    "@fastify/helmet": "^10.0.0 || ^11.0.0 || ^12.0.0 || ^13.0.0",
+    "@fastify/rate-limit": "^8.0.0 || ^9.0.0 || ^10.0.0",
+    "@nestjs/common": "^10.0.0 || ^11.0.0",
+    "@nestjs/core": "^10.0.0 || ^11.0.0",
+    "rxjs": "^7.0.0",
+    "express": "^4.0.0 || ^5.0.0",
+    "fastify": "^4.0.0 || ^5.0.0",
+    "fastify-plugin": "^4.0.0 || ^5.0.0",
+    "joi": "^17.0.0",
+    "zod": "^3.0.0 || ^4.0.0"
   },
   "peerDependenciesMeta": {
     "zod": {
@@ -73,6 +79,15 @@
     },
     "@fastify/rate-limit": {
       "optional": true
+    },
+    "@nestjs/common": {
+      "optional": true
+    },
+    "@nestjs/core": {
+      "optional": true
+    },
+    "rxjs": {
+      "optional": true
     }
   },
   "dependencies": {
@@ -85,10 +100,15 @@
     "@fastify/cors": "^11.2.0",
     "@fastify/helmet": "^13.0.2",
     "@fastify/rate-limit": "^10.3.0",
+    "@nestjs/common": "^11.1.16",
+    "@nestjs/core": "^11.1.16",
+    "@nestjs/throttler": "^6.5.0",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "fastify": "^5.8.2",
     "fastify-plugin": "^5.1.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
     "typescript": "^5.9.3"
   }
 }
