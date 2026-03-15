@@ -1,6 +1,6 @@
 # 🛡️ Backend Guard
 
-All-in-one security middleware for **Express.js** and **Fastify**. Stop installing 6 packages — one config, full protection.
+All-in-one security middleware for **Express.js**, **Fastify**, and **NestJS**. Stop installing 6 packages — one config, full protection.
 
 [![npm version](https://img.shields.io/npm/v/backend-guard.svg)](https://www.npmjs.com/package/backend-guard)
 [![npm downloads](https://img.shields.io/npm/dw/backend-guard.svg)](https://www.npmjs.com/package/backend-guard)
@@ -68,6 +68,27 @@ async function start() {
 start();
 ```
 
+### NestJS
+
+```ts
+import { Module } from "@nestjs/common";
+import { BackendGuardModule } from "backend-guard";
+
+@Module({
+  imports: [
+    BackendGuardModule.forRoot({
+      protectHeaders: true,        // helmet — security headers
+      cors: ["https://myapp.com"], // allowed origins
+      rateLimit: true,             // 100 req / 15 min
+      xss: true,                   // sanitize req.body/query/params
+      requestLogging: true,        // log every request
+      ipBlacklist: ["1.2.3.4"],    // block specific IPs
+    }),
+  ],
+})
+export class AppModule {}
+```
+
 **One package. One config. Full security.**
 
 ---
@@ -106,6 +127,21 @@ npm install @fastify/rate-limit # rateLimit
 ```
 
 > Only install what you use — each plugin is optional.
+
+### Peer Dependencies — NestJS
+
+```bash
+npm install @nestjs/common @nestjs/core rxjs reflect-metadata
+```
+
+For HTTP platform (Express adapter, default):
+
+```bash
+npm install @nestjs/platform-express
+```
+
+> `helmet` and `cors` (already bundled) are applied as middleware on the Express adapter.  
+> The rate limiter, IP blacklist, XSS protection and request logger use NestJS Guards/Interceptors and work with **both** Express and Fastify adapters.
 
 ---
 
@@ -272,6 +308,79 @@ app.use(backendGuard({
 
 ---
 
+## NestJS
+
+### Module Setup
+
+```ts
+// app.module.ts
+import { Module } from "@nestjs/common";
+import { BackendGuardModule } from "backend-guard";
+
+@Module({
+  imports: [
+    BackendGuardModule.forRoot({
+      protectHeaders: true,
+      cors: true,
+      rateLimit: { windowMs: 60_000, limit: 20 },
+      xss: true,
+      requestLogging: true,
+      ipBlacklist: ["1.2.3.4"],
+    }),
+  ],
+})
+export class AppModule {}
+```
+
+`BackendGuardModule` is **global** — no need to re-import it in feature modules.
+
+### How Each Feature is Applied
+
+| Option | Mechanism | Adapter |
+|--------|-----------|---------|
+| `protectHeaders` | NestJS middleware (helmet) | Express only |
+| `cors` | NestJS middleware (cors) | Express only |
+| `rateLimit` | `RateLimitGuard` — in-memory, per IP | Both |
+| `ipBlacklist` | `IpBlacklistGuard` | Both |
+| `xss` | `XssInterceptor` — body, query, params | Both |
+| `requestLogging` | `RequestLoggingInterceptor` | Both |
+
+> For Fastify adapter: register `@fastify/helmet` and `@fastify/cors` manually in `main.ts`. All other features work out of the box.
+
+### Using Individual Guards / Interceptors
+
+You can import the primitives directly for custom setups:
+
+```ts
+import {
+  IpBlacklistGuard,
+  RateLimitGuard,
+  XssInterceptor,
+  RequestLoggingInterceptor,
+  BACKEND_GUARD_OPTIONS,
+} from "backend-guard";
+```
+
+### Rate Limiter
+
+The built-in `RateLimitGuard` uses an **in-memory store** (per process). For multi-instance / Redis-backed rate limiting, use [@nestjs/throttler](https://docs.nestjs.com/security/rate-limiting) alongside or instead.
+
+### main.ts Bootstrap
+
+```ts
+import { NestFactory } from "@nestjs/core";
+import { AppModule } from "./app.module";
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+  app.set("trust proxy", 1); // needed for correct IP behind a proxy
+  await app.listen(3000);
+}
+bootstrap();
+```
+
+---
+
 ## Using Individual Middlewares
 
 ### Express
@@ -317,6 +426,17 @@ Backend Guard wraps these battle-tested packages:
 | XSS Protection | [xss](https://www.npmjs.com/package/xss) |
 | Validation | [zod](https://www.npmjs.com/package/zod) / [joi](https://www.npmjs.com/package/joi) |
 
+### NestJS
+
+| Feature | Mechanism |
+|---------|----------|
+| Security Headers | [helmet](https://www.npmjs.com/package/helmet) via NestJS middleware |
+| CORS | [cors](https://www.npmjs.com/package/cors) via NestJS middleware |
+| Rate Limiting | Built-in `RateLimitGuard` (in-memory) |
+| XSS Protection | Built-in `XssInterceptor` using [xss](https://www.npmjs.com/package/xss) |
+| IP Blacklist | Built-in `IpBlacklistGuard` |
+| Request Logging | Built-in `RequestLoggingInterceptor` |
+
 ---
 
 ## TypeScript
@@ -335,7 +455,7 @@ const config: BackendGuardOptions = {
 app.use(backendGuard(config));
 ```
 
-The same `BackendGuardOptions` type is shared between Express and Fastify:
+The same `BackendGuardOptions` type is shared across Express, Fastify, and NestJS:
 
 ```ts
 import { backendGuardFastify, type BackendGuardOptions } from "backend-guard";
@@ -349,9 +469,30 @@ const config: BackendGuardOptions = {
 await fastify.register(backendGuardFastify(config));
 ```
 
+```ts
+import { BackendGuardModule, type BackendGuardOptions } from "backend-guard";
+
+const config: BackendGuardOptions = {
+  protectHeaders: true,
+  cors: ["https://myapp.com"],
+  rateLimit: { limit: 200 },
+};
+
+BackendGuardModule.forRoot(config);
+```
+
 ---
 
 ## Changelog
+
+### v1.3.0
+- Added full **NestJS** support via `BackendGuardModule.forRoot()`
+- `RateLimitGuard` — in-memory per-IP rate limiting, works with Express & Fastify adapters
+- `IpBlacklistGuard` — adapter-agnostic IP blocking
+- `XssInterceptor` — sanitizes `body`, `query`, and `params` via NestJS interceptor
+- `RequestLoggingInterceptor` — request logging via NestJS interceptor
+- `helmet` and `cors` applied as NestJS middleware (Express adapter)
+- All options use the same shared `BackendGuardOptions` interface
 
 ### v1.2.0
 - Added full **Fastify** support via `backendGuardFastify()` — all options shared with Express
