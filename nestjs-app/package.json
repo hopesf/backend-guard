@@ -1,0 +1,26 @@
+{
+  "name": "nestjs-app",
+  "version": "1.0.0",
+  "description": "NestJS test app for backend-guard",
+  "scripts": {
+    "start": "ts-node src/main.ts",
+    "install:dev": "npm install --install-links"
+  },
+  "_devNote": "Use 'npm run install:dev' instead of 'npm install' when using file: dependencies. --install-links copies the package instead of symlinking, ensuring Node.js resolves peer deps (e.g. @nestjs/common) from this app's node_modules.",
+  "dependencies": {
+    "@nestjs/common": "^11.0.0",
+    "@nestjs/core": "^11.0.0",
+    "@nestjs/platform-express": "^11.0.0",
+    "@nestjs/throttler": "^6.0.0",
+    "backend-guard": "file:../",
+    "reflect-metadata": "^0.2.0",
+    "rxjs": "^7.0.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.0.0",
+    "ts-node": "^10.0.0",
+    "typescript": "^5.9.0"
+  }
+}

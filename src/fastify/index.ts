@@ -8,23 +8,14 @@ import { createIpBlacklistHook } from "./hooks/ip-blacklist";
 import { createXssHook } from "./hooks/xss";
 import { createRequestLoggingHook } from "./hooks/request-logger";
 
-/**
- * Dynamically requires a package and throws a helpful error if not installed.
- *
- * This is how we make @fastify/* packages optional at runtime:
- * - They are devDependencies (TypeScript can compile against their types)
- * - They are optional peerDependencies (users install only what they need)
- * - Express-only users never need to install any @fastify/* packages
- */
-function tryRequire(name: string): unknown {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    return require(name);
-  } catch {
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+function requireOptional(mod: unknown, name: string): unknown {
+  if (mod === undefined) {
     throw new Error(
       `[backend-guard] "${name}" is required for this feature. Install it: npm install ${name}`
     );
   }
+  return mod;
 }
 
 /**
@@ -126,21 +117,27 @@ export function backendGuardFastify(options: BackendGuardOptions = {}): FastifyP
 
     // 2. Rate limiting — cut excessive requests early
     if (options.rateLimit) {
-      const mod = tryRequire("@fastify/rate-limit");
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const rl = (() => { try { return require("@fastify/rate-limit"); } catch { return undefined; } })();
+      const mod = requireOptional(rl, "@fastify/rate-limit");
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await fastify.register(getDefault(mod) as any, buildRateLimitOpts(options.rateLimit as true | RateLimitConfig) as any);
     }
 
     // 3. Security headers
     if (options.protectHeaders) {
-      const mod = tryRequire("@fastify/helmet");
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const hl = (() => { try { return require("@fastify/helmet"); } catch { return undefined; } })();
+      const mod = requireOptional(hl, "@fastify/helmet");
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await fastify.register(getDefault(mod) as any, buildHelmetOpts(options.protectHeaders as true | HelmetOptions) as any);
     }
 
     // 4. CORS
     if (options.cors) {
-      const mod = tryRequire("@fastify/cors");
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const co = (() => { try { return require("@fastify/cors"); } catch { return undefined; } })();
+      const mod = requireOptional(co, "@fastify/cors");
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await fastify.register(getDefault(mod) as any, buildCorsOpts(options.cors as true | string[] | CorsOptions) as any);
     }

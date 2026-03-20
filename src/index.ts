@@ -19,6 +19,18 @@ export { backendGuardFastify } from "./fastify/index";
 export { createFastifyValidator } from "./fastify/hooks/validate";
 
 // ============================================================
+// NestJS
+// ============================================================
+export {
+  BackendGuardModule,
+  BACKEND_GUARD_OPTIONS,
+  IpBlacklistGuard,
+  RateLimitGuard,
+  XssInterceptor,
+  RequestLoggingInterceptor,
+} from "./nestjs/index";
+
+// ============================================================
 // Shared types
 // ============================================================
 export type {

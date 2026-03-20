@@ -33,11 +33,11 @@ const app = express();
 
 app.use(backendGuard({
   protectHeaders: true,        // helmet — security headers
-  cors: ["https://myapp.com"], // cors — allowed origins
+  cors: ["https://example.com"], // cors — allowed origins
   rateLimit: true,             // 100 req / 15 min
   xss: true,                   // sanitize req.body/query/params
   requestLogging: true,        // log every request
-  ipBlacklist: ["1.2.3.4"],    // block specific IPs
+  ipBlacklist: ["192.0.2.1"],    // block specific IPs
 }));
 ```
 
@@ -52,11 +52,11 @@ const fastify = Fastify({ trustProxy: true });
 async function start() {
   await fastify.register(backendGuardFastify({
     protectHeaders: true,
-    cors: ["https://myapp.com"],
+    cors: ["https://example.com"],
     rateLimit: true,
     xss: true,
     requestLogging: true,
-    ipBlacklist: ["1.2.3.4"],
+    ipBlacklist: ["192.0.2.1"],
   }));
 
   // register your routes after the plugin
@@ -78,11 +78,11 @@ import { BackendGuardModule } from "backend-guard";
   imports: [
     BackendGuardModule.forRoot({
       protectHeaders: true,        // helmet — security headers
-      cors: ["https://myapp.com"], // allowed origins
+      cors: ["https://example.com"], // allowed origins
       rateLimit: true,             // 100 req / 15 min
       xss: true,                   // sanitize req.body/query/params
       requestLogging: true,        // log every request
-      ipBlacklist: ["1.2.3.4"],    // block specific IPs
+      ipBlacklist: ["192.0.2.1"],    // block specific IPs
     }),
   ],
 })
@@ -193,13 +193,13 @@ app.use(backendGuard({ cors: true }));
 
 // Allow specific origins (production)
 app.use(backendGuard({
-  cors: ["https://myapp.com", "https://admin.myapp.com"]
+  cors: ["https://example.com", "https://admin.example.com"]
 }));
 
 // Full control
 app.use(backendGuard({
   cors: {
-    origin: "https://myapp.com",
+    origin: "https://example.com",
     methods: ["GET", "POST"],
     credentials: true,
   }
@@ -325,7 +325,7 @@ import { BackendGuardModule } from "backend-guard";
       rateLimit: { windowMs: 60_000, limit: 20 },
       xss: true,
       requestLogging: true,
-      ipBlacklist: ["1.2.3.4"],
+      ipBlacklist: ["192.0.2.1"],
     }),
   ],
 })
@@ -448,7 +448,7 @@ import { backendGuard, type BackendGuardOptions } from "backend-guard";
 
 const config: BackendGuardOptions = {
   protectHeaders: true,
-  cors: ["https://myapp.com"],
+  cors: ["https://example.com"],
   rateLimit: { limit: 200 },
 };
 
@@ -462,7 +462,7 @@ import { backendGuardFastify, type BackendGuardOptions } from "backend-guard";
 
 const config: BackendGuardOptions = {
   protectHeaders: true,
-  cors: ["https://myapp.com"],
+  cors: ["https://example.com"],
   rateLimit: { limit: 200 },
 };
 
@@ -474,7 +474,7 @@ import { BackendGuardModule, type BackendGuardOptions } from "backend-guard";
 
 const config: BackendGuardOptions = {
   protectHeaders: true,
-  cors: ["https://myapp.com"],
+  cors: ["https://example.com"],
   rateLimit: { limit: 200 },
 };
 
