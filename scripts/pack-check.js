@@ -7,7 +7,9 @@ const path = require("node:path");
 
 const root = path.resolve(__dirname, "..");
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "bg-pack-"));
-const run = (cmd, cwd) => execSync(cmd, { cwd, stdio: "pipe" }).toString().trim();
+// `npm publish --dry-run` exports npm_config_dry_run, which would turn our nested pack/install into no-ops
+const env = { ...process.env, npm_config_dry_run: "false" };
+const run = (cmd, cwd) => execSync(cmd, { cwd, env, stdio: "pipe" }).toString().trim();
 
 try {
   const tgz = run(`npm pack --pack-destination "${tmp}" --silent`, root).split("\n").pop();
@@ -19,7 +21,7 @@ try {
   );
   if (out !== "ok") throw new Error("unexpected output: " + out);
   // the CLI must be installed as a bin and run
-  const cli = execSync("npx backend-guard doctor . --json", { cwd: tmp, stdio: "pipe" }).toString();
+  const cli = execSync("npx backend-guard doctor . --json", { cwd: tmp, env, stdio: "pipe" }).toString();
   JSON.parse(cli);
   console.log("pack-check: OK (express-only install loads without optional peers)");
 } catch (err) {

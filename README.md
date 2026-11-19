@@ -89,7 +89,7 @@ import { BackendGuardModule } from "backend-guard/nestjs";
 export class AppModule {}
 ```
 
-**One package. One config. Full security.**
+**One package. One config. Secure defaults — and a doctor that tells you when your setup is risky.**
 
 ---
 
