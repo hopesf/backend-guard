@@ -184,8 +184,8 @@ A heuristic checklist (not a verdict): wildcard CORS (and CORS + credentials), s
 
 - **Behind a proxy?** Set `trust proxy` (Express/Nest) or `trustProxy` (Fastify) correctly. Without it every client shares the proxy's IP (rate limit and blacklist break); with a too-permissive value clients can spoof `X-Forwarded-For` and evade both.
 - **`xss` is input sanitization**, not a substitute for context-aware output encoding. It cleans HTML in strings, so fields that legitimately contain `<`/`>` (e.g. passwords) may be altered; scope it with `xss: { body: false, ... }` or per-route use if needed. Mount it **after** `express.json()`.
-- **Rate limiting is per process** (in memory). For several instances use a shared store (e.g. Redis via `express-rate-limit` stores, `@fastify/rate-limit` `redis` option).
-- **IP blacklist** matches exact addresses (IPv4-mapped IPv6 such as `::ffff:1.2.3.4` is normalized). CIDR ranges are not supported yet.
+- **Rate limiting is per process** (in memory) unless you pass a shared store — see "Redis store" below.
+- **IP blacklist** accepts exact IPs and CIDR ranges (IPv4 and IPv6, e.g. `"10.0.0.0/8"`, `"2001:db8::/32"`); IPv4-mapped IPv6 such as `::ffff:1.2.3.4` is normalized first.
 - **Request logging** masks sensitive query values (`token`, `password`, `api_key`, ...) as `[REDACTED]`; extend the list with `redactQuery: ["myParam"]`. Still avoid secrets in URLs.
 
 ---
@@ -282,6 +282,37 @@ backendGuard({
 - `noSqlInjection` flags keys that start with `$` or look like `a[$ne]`; `dots: true` also flags `a.b` keys. Prefer `"reject"` (default) so attacks are visible.
 - `parameterPollution` keeps one value (`keep: "last" | "first"`) for repeated query parameters. Note `?a[]=1&a[]=2` is indistinguishable from `?a=1&a=2` for some parsers — whitelist parameters that must be arrays.
 - Both run before `xss`. Mount after `express.json()`.
+
+### Redis store (shared rate limits)
+
+```ts
+import Redis from "ioredis";               // or: import { createClient } from "redis"
+import { RedisRateLimitStore } from "backend-guard/core";
+
+const store = new RedisRateLimitStore(new Redis(), { onError: (e) => logger.error(e) });
+app.use(backendGuard({ rateLimit: { limit: 100, store } }));   // also Fastify and Nest
+```
+
+Works with `ioredis` and node-redis v4 (no dependency on either). If Redis fails the store **fails open** by default (requests pass, `onError` is called); use `failOpen: false` to fail closed. Bring any other backend by implementing `{ hit(key, windowMs), get?, reset? }`.
+
+### Login brute-force protection
+
+```ts
+import { createBruteForceMiddleware } from "backend-guard/express";
+
+app.post("/login",
+  createBruteForceMiddleware({ maxAttempts: 5, windowMs: 15 * 60 * 1000, store }),
+  loginHandler);
+```
+
+```ts
+// Fastify
+import { createBruteForceHooks } from "backend-guard/fastify";
+const bf = createBruteForceHooks({ maxAttempts: 5 });
+fastify.post("/login", { preHandler: bf.preHandler, onResponse: bf.onResponse }, handler);
+```
+
+Attempts are counted **before** the handler (parallel guesses cannot race past the limit) per IP+account and, optionally, per account across all IPs (`maxAttemptsPerAccount`, default ×5; set `false` to prevent deliberate lock-outs of a victim). After the limit the route answers `429` with `Retry-After`; a 2xx/3xx response clears the counters. The account is read from `body.email | username | login | user` or your `identifier(req)`. NestJS: use `BruteForceProtector` from `backend-guard/core` in your own guard.
 
 ### Safe error responses
 
@@ -489,6 +520,13 @@ BackendGuardModule.forRoot(config);
 ---
 
 ## Changelog
+
+### v2.2.0
+- **CIDR:** `ipBlacklist` accepts IPv4/IPv6 CIDR ranges (plus mapped-IPv6 ranges).
+- **Shared stores:** `rateLimit.store` for Express, Fastify and Nest; built-in `RedisRateLimitStore` (ioredis / node-redis, fail-open by default).
+- **Brute force:** `BruteForceProtector` (core), `createBruteForceMiddleware` (Express), `createBruteForceHooks` (Fastify).
+- Fix: `MemoryStore` returns snapshots, so concurrent requests no longer see each other's increments.
+- Doctor/CLI: invalid CIDR detection, unthrottled login route check.
 
 ### v2.1.0
 - **Input hardening:** `noSqlInjection` (reject or strip `$`-operator keys in body/query, Express/Fastify/Nest) and `parameterPollution` (collapse repeated query params, with whitelist).

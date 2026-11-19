@@ -8,6 +8,7 @@ import { createIpBlacklistHook } from "./hooks/ip-blacklist";
 import { createXssHook } from "./hooks/xss";
 import { createRequestLoggingHook } from "./hooks/request-logger";
 import { createHppHook, createNoSqlHook } from "./hooks/input";
+import type { RateLimitStore } from "../core/rate-limit";
 import { resolveSafeErrors, toSafeError } from "../core/errors";
 import { resolveRateLimit } from "../core/options";
 import { validateOptions } from "../core/options";
@@ -45,11 +46,28 @@ function getDefault(mod: unknown): unknown {
  * - windowMs → timeWindow
  * - limit    → max
  */
+/** Adapts a backend-guard store to @fastify/rate-limit's custom store contract. */
+function toFastifyStore(store: RateLimitStore, prefix = "bg:rl:") {
+  class BackendGuardFastifyStore {
+    incr(key: string, cb: (err: Error | null, res?: { current: number; ttl: number }) => void, timeWindow: number) {
+      Promise.resolve(store.hit(prefix + key, timeWindow)).then(
+        (r) => cb(null, { current: r.count, ttl: Math.max(0, r.resetAt - Date.now()) }),
+        (err) => cb(err as Error),
+      );
+    }
+    child() {
+      return new BackendGuardFastifyStore();
+    }
+  }
+  return BackendGuardFastifyStore;
+}
+
 function buildRateLimitOpts(option: true | RateLimitConfig) {
   const c = resolveRateLimit(option)!;
   return {
     timeWindow: c.windowMs,
     max: c.limit,
+    ...(c.store ? { store: toFastifyStore(c.store) } : {}),
     errorResponseBuilder: () => ({
       statusCode: c.statusCode,
       error: "Too Many Requests",
@@ -190,4 +208,6 @@ export function backendGuardFastify(options: BackendGuardOptions = {}): FastifyP
   return fp(plugin, { fastify: ">=4.0.0", name: "backend-guard" });
 }
 
+export { createBruteForceHooks } from "./hooks/brute-force";
+export type { FastifyBruteForceOptions } from "./hooks/brute-force";
 export type { BackendGuardOptions, RateLimitConfig, XssConfig, RequestLoggingConfig } from "../types";

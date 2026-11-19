@@ -52,6 +52,13 @@ describe("scanProject", () => {
     write("r.js", "const u = await User.findOne(req.body);");
     expect(ids()).toContain("nosql-injection-risk");
   });
+  it("flags an unthrottled login route", () => {
+    write("package.json", JSON.stringify({ dependencies: { express: "5" } }));
+    write("auth.js", 'app.post("/login", handler);');
+    expect(ids()).toContain("login-no-throttle");
+    write("auth.js", 'app.post("/login", limiter, handler);');
+    expect(ids()).not.toContain("login-no-throttle");
+  });
   it("notes missing trust proxy when rate limiting is used", () => {
     write("package.json", JSON.stringify({ dependencies: { "express-rate-limit": "8" } }));
     write("a.js", "x");

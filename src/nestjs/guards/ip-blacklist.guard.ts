@@ -6,7 +6,7 @@ import {
   Injectable,
 } from "@nestjs/common";
 
-import { buildIpSet, normalizeIp } from "../../core/ip";
+import { createIpMatcher, type IpMatcher } from "../../core/ip";
 import type { BackendGuardOptions } from "../../types";
 import { BACKEND_GUARD_OPTIONS } from "../nestjs.constants";
 
@@ -24,13 +24,13 @@ import { BACKEND_GUARD_OPTIONS } from "../nestjs.constants";
 @Injectable()
 export class IpBlacklistGuard implements CanActivate {
   // Set<string> for O(1) lookups — much faster than Array.includes()
-  private readonly blockedIps: Set<string>;
+  private readonly isBlocked: IpMatcher;
 
   constructor(
     @Inject(BACKEND_GUARD_OPTIONS)
     options: BackendGuardOptions,
   ) {
-    this.blockedIps = buildIpSet(options.ipBlacklist ?? []);
+    this.isBlocked = createIpMatcher(options.ipBlacklist ?? []);
   }
 
   canActivate(context: ExecutionContext): boolean {
@@ -38,9 +38,7 @@ export class IpBlacklistGuard implements CanActivate {
       .switchToHttp()
       .getRequest<{ ip?: string; socket?: { remoteAddress?: string } }>();
 
-    const clientIp = normalizeIp(req.ip ?? req.socket?.remoteAddress);
-
-    if (this.blockedIps.has(clientIp)) {
+    if (this.isBlocked(req.ip ?? req.socket?.remoteAddress)) {
       throw new ForbiddenException("Your IP address has been blocked.");
     }
 

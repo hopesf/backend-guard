@@ -1,9 +1,11 @@
 {
   "name": "backend-guard",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "Secure-by-default security layer for Express, Fastify and NestJS — headers, CORS, rate limit, XSS sanitization, safe request logging, IP blacklist, plus a startup doctor that flags risky configuration.",
   "keywords": [
     "backend-security",
+    "brute-force",
+    "cidr",
     "cors",
     "doctor",
     "express",
@@ -17,6 +19,7 @@
     "nosql-injection",
     "parameter-pollution",
     "rate-limit",
+    "redis",
     "request-logging",
     "security",
     "security-audit",

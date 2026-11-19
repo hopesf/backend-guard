@@ -1,6 +1,6 @@
 import type { RateLimitConfig, RequestLoggingConfig } from "../types";
 
-export const DEFAULT_RATE_LIMIT: Required<Omit<RateLimitConfig, never>> = {
+export const DEFAULT_RATE_LIMIT: Required<Omit<RateLimitConfig, "store">> = {
   windowMs: 15 * 60 * 1000,
   limit: 100,
   message: "Too many requests, please try again later.",

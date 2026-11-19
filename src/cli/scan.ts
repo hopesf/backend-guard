@@ -116,6 +116,14 @@ export function scanProject(root: string): ScanFinding[] {
       if (q) add("nosql-injection-risk", "warn", "Request data is passed directly into a MongoDB query; `{ \"$ne\": null }` style payloads can bypass filters. Validate input or enable backend-guard `noSqlInjection`.", q.index);
     }
 
+    // Login route without any throttling
+    if (!testFile && !has("backend-guard", "express-rate-limit", "@fastify/rate-limit", "@nestjs/throttler", "rate-limiter-flexible")) {
+      const login = /\.(post|route)\(\s*["'`]\/(?:api\/)?(?:v\d+\/)?(?:auth\/)?(login|signin|sign-in)["'`]/i.exec(text);
+      if (login && !/brute|rate[-_]?limit|limiter|throttl/i.test(text)) {
+        add("login-no-throttle", "warn", "Login route without visible rate limiting / brute-force protection (backend-guard: createBruteForceMiddleware).", login.index);
+      }
+    }
+
     // TLS verification off
     const tls = /rejectUnauthorized\s*:\s*false|NODE_TLS_REJECT_UNAUTHORIZED\s*=\s*["']?0/.exec(text);
     if (tls && !testFile) add("tls-verify-off", "error", "TLS certificate verification is disabled.", tls.index);

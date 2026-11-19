@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import express from "express";
 import request from "supertest";
-import { backendGuard, backendGuardErrors } from "../src/index";
+import { backendGuard, backendGuardErrors, createBruteForceMiddleware } from "../src/index";
+import { MemoryStore } from "../src/core/rate-limit";
 
 function makeApp(opts: Parameters<typeof backendGuard>[0]) {
   const app = express();
@@ -120,5 +121,43 @@ describe("express input hardening", () => {
     expect(bad.status).toBe(400);
     expect(bad.body.message).toBe("name is required");
     expect(logged).toHaveLength(2);
+  });
+});
+
+describe("express CIDR, custom store, brute force", () => {
+  it("blocks CIDR ranges", async () => {
+    const app = makeApp({ ipBlacklist: ["10.0.0.0/8"] });
+    expect((await request(app).get("/").set("X-Forwarded-For", "10.5.5.5")).status).toBe(403);
+    expect((await request(app).get("/").set("X-Forwarded-For", "11.5.5.5")).status).toBe(200);
+  });
+  it("rate-limits through a custom store", async () => {
+    const store = new MemoryStore();
+    const keys: string[] = [];
+    const spy = { hit: (k: string, w: number) => { keys.push(k); return store.hit(k, w); }, reset: (k: string) => store.reset(k) };
+    const app = makeApp({ rateLimit: { limit: 2, windowMs: 60000, store: spy } });
+    const codes: number[] = [];
+    for (let i = 0; i < 3; i++) codes.push((await request(app).get("/")).status);
+    expect(codes).toEqual([200, 200, 429]);
+    expect(keys.length).toBe(3);
+    expect(keys[0]).toMatch(/^bg:rl:/);
+  });
+  it("bruteForce: locks after failures, resets on success, per account", async () => {
+    const app = express();
+    app.set("trust proxy", 1);
+    app.use(express.json());
+    app.post("/login", createBruteForceMiddleware({ maxAttempts: 3, maxAttemptsPerAccount: false }), (req, res) => {
+      res.status(req.body.password === "right" ? 200 : 401).json({});
+    });
+    const login = (ip: string, email: string, password: string) =>
+      request(app).post("/login").set("X-Forwarded-For", ip).send({ email, password });
+
+    expect((await login("1.1.1.1", "a@x.co", "bad")).status).toBe(401);
+    expect((await login("1.1.1.1", "a@x.co", "right")).status).toBe(200); // success clears
+    for (let i = 0; i < 3; i++) expect((await login("1.1.1.1", "a@x.co", "bad")).status).toBe(401);
+    const locked = await login("1.1.1.1", "a@x.co", "right");
+    expect(locked.status).toBe(429);
+    expect(Number(locked.headers["retry-after"])).toBeGreaterThan(0);
+    expect((await login("1.1.1.1", "b@x.co", "bad")).status).toBe(401); // other account ok
+    expect((await login("2.2.2.2", "a@x.co", "right")).status).toBe(200); // other IP ok
   });
 });

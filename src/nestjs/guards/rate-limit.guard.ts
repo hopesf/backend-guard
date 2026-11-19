@@ -31,14 +31,15 @@ export class RateLimitGuard implements CanActivate {
     options: BackendGuardOptions,
   ) {
     const config = resolveRateLimit(options.rateLimit ?? true)!;
-    this.limiter = new RateLimiter(config.windowMs, config.limit, new MemoryStore());
+    this.limiter = new RateLimiter(config.windowMs, config.limit, config.store ?? new MemoryStore());
     this.statusCode = config.statusCode;
     this.message = config.message;
   }
 
   /** Number of tracked keys (exposed for tests/diagnostics). */
   get size(): number {
-    return (this.limiter.store as MemoryStore).size;
+    const store = this.limiter.store;
+    return store instanceof MemoryStore ? store.size : 0;
   }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {

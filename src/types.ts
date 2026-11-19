@@ -1,5 +1,6 @@
 import type { CorsOptions } from "cors";
 import type { HelmetOptions } from "helmet";
+import type { RateLimitStore } from "./core/rate-limit";
 
 /**
  * Rate limiting configuration.
@@ -14,6 +15,11 @@ export interface RateLimitConfig {
   message?: string;
   /** HTTP status code. Default: 429 */
   statusCode?: number;
+  /**
+   * Shared counter store (e.g. `new RedisRateLimitStore(redis)`) so limits hold across
+   * instances. Default: in-process memory. Express, Fastify and NestJS all honor it.
+   */
+  store?: RateLimitStore;
 }
 
 /**

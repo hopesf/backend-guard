@@ -1,5 +1,5 @@
 import type { FastifyRequest, FastifyReply } from "fastify";
-import { buildIpSet, normalizeIp } from "../../core/ip";
+import { createIpMatcher } from "../../core/ip";
 
 /**
  * Creates a Fastify onRequest hook for IP blacklist checking.
@@ -13,12 +13,10 @@ import { buildIpSet, normalizeIp } from "../../core/ip";
  */
 export function createIpBlacklistHook(blacklist: string[]) {
   // Set for O(1) lookup — much faster than Array.includes() for large lists
-  const blockedIps = buildIpSet(blacklist);
+  const isBlocked = createIpMatcher(blacklist);
 
   return async (request: FastifyRequest, reply: FastifyReply): Promise<FastifyReply | void> => {
-    const clientIp = normalizeIp(request.ip);
-
-    if (blockedIps.has(clientIp)) {
+    if (isBlocked(request.ip)) {
       // `return reply` tells Fastify the response was already sent
       return reply.status(403).send({
         error: "Forbidden",

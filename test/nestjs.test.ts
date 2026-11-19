@@ -5,6 +5,7 @@ import { Test } from "@nestjs/testing";
 import request from "supertest";
 import { BackendGuardModule } from "../src/nestjs/index";
 import { RateLimitGuard } from "../src/nestjs/guards/rate-limit.guard";
+import { MemoryStore } from "../src/core/rate-limit";
 import type { BackendGuardOptions } from "../src/types";
 
 @Controller()
@@ -73,6 +74,23 @@ describe("nestjs input hardening", () => {
     const a = await makeApp({ noSqlInjection: { mode: "strip" } });
     const res = await request(a.getHttpServer()).post("/b").send({ e: { $ne: null }, ok: 1 });
     expect(res.body.body).toEqual({ e: {}, ok: 1 });
+  });
+});
+
+describe("nestjs CIDR and custom store", () => {
+  it("blocks CIDR ranges", async () => {
+    const a = await makeApp({ ipBlacklist: ["10.0.0.0/8"] });
+    expect((await request(a.getHttpServer()).get("/").set("X-Forwarded-For", "10.1.1.1")).status).toBe(403);
+    expect((await request(a.getHttpServer()).get("/").set("X-Forwarded-For", "11.1.1.1")).status).toBe(200);
+  });
+  it("rate-limits through a custom store", async () => {
+    const store = new MemoryStore();
+    let hits = 0;
+    const a = await makeApp({ rateLimit: { limit: 2, windowMs: 60000, store: { hit: (k, w) => { hits++; return store.hit(k, w); } } } });
+    const codes: number[] = [];
+    for (let i = 0; i < 3; i++) codes.push((await request(a.getHttpServer()).get("/")).status);
+    expect(codes).toEqual([200, 200, 429]);
+    expect(hits).toBe(3);
   });
 });
 

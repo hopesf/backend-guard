@@ -113,6 +113,8 @@ export { createHelmetMiddleware } from "./middleware/helmet";
 export { createCorsMiddleware } from "./middleware/cors";
 export { createRateLimitMiddleware } from "./middleware/rate-limit";
 export { createXssMiddleware } from "./middleware/xss";
+export { createBruteForceMiddleware } from "./middleware/brute-force";
+export type { ExpressBruteForceOptions } from "./middleware/brute-force";
 export { createHppMiddleware, createNoSqlMiddleware, backendGuardErrors } from "./middleware/input";
 export { createRequestLoggingMiddleware } from "./middleware/request-logger";
 export { createIpBlacklistMiddleware } from "./middleware/ip-blacklist";

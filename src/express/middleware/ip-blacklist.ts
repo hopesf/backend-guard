@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction, RequestHandler } from "express";
-import { buildIpSet, normalizeIp } from "../../core/ip";
+import { createIpMatcher } from "../../core/ip";
 
 /**
  * Creates the IP blacklist middleware.
@@ -27,12 +27,10 @@ export function createIpBlacklistMiddleware(
   // Using Set for O(1) lookup performance.
   // Array.includes() → O(n), Set.has() → O(1)
   // The difference is significant with a list of 1000 IPs.
-  const blockedIps = buildIpSet(blacklist);
+  const isBlocked = createIpMatcher(blacklist);
 
   return (req: Request, res: Response, next: NextFunction): void => {
-    const clientIp = normalizeIp(req.ip || req.socket.remoteAddress);
-
-    if (blockedIps.has(clientIp)) {
+    if (isBlocked(req.ip || req.socket.remoteAddress)) {
       res.status(403).json({
         error: "Forbidden",
         message: "Your IP address has been blocked.",

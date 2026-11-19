@@ -11,6 +11,10 @@ export interface HitResult {
  */
 export interface RateLimitStore {
   hit(key: string, windowMs: number): HitResult | Promise<HitResult>;
+  /** Reads the counter without incrementing it (needed by some features). */
+  get?(key: string): HitResult | null | Promise<HitResult | null>;
+  /** Removes the counter for `key`. */
+  reset?(key: string): void | Promise<void>;
 }
 
 /** In-process store. Expired entries are swept at most once per window. */
@@ -32,10 +36,20 @@ export class MemoryStore implements RateLimitStore {
     if (!rec || now > rec.resetAt) {
       const fresh = { count: 1, resetAt: now + windowMs };
       this.records.set(key, fresh);
-      return fresh;
+      return { ...fresh };
     }
     rec.count++;
-    return rec;
+    // return a snapshot: callers await the result, and concurrent hits must not inflate it
+    return { ...rec };
+  }
+
+  get(key: string): HitResult | null {
+    const rec = this.records.get(key);
+    return rec && Date.now() <= rec.resetAt ? { ...rec } : null;
+  }
+
+  reset(key: string): void {
+    this.records.delete(key);
   }
 
   get size(): number {

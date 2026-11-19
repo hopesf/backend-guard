@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import Fastify from "fastify";
-import { backendGuardFastify } from "../src/fastify/index";
+import { backendGuardFastify, createBruteForceHooks } from "../src/fastify/index";
+import { MemoryStore } from "../src/core/rate-limit";
 
 async function makeApp(opts: Parameters<typeof backendGuardFastify>[0]) {
   const app = Fastify({ trustProxy: true });
@@ -93,5 +94,39 @@ describe("fastify input hardening", () => {
     expect(bad.statusCode).toBe(400);
     expect(bad.json().message).toBe("name required");
     expect(logged).toHaveLength(2);
+  });
+});
+
+describe("fastify CIDR, custom store, brute force", () => {
+  it("blocks CIDR ranges", async () => {
+    const app = await makeApp({ ipBlacklist: ["10.0.0.0/8"] });
+    expect((await app.inject({ url: "/", headers: { "x-forwarded-for": "10.9.9.9" } })).statusCode).toBe(403);
+    expect((await app.inject({ url: "/", headers: { "x-forwarded-for": "11.9.9.9" } })).statusCode).toBe(200);
+  });
+  it("rate-limits through a custom store", async () => {
+    const store = new MemoryStore();
+    let hits = 0;
+    const app = await makeApp({ rateLimit: { limit: 2, windowMs: 60000, store: { hit: (k, w) => { hits++; return store.hit(k, w); } } } });
+    const codes: number[] = [];
+    for (let i = 0; i < 3; i++) codes.push((await app.inject({ url: "/" })).statusCode);
+    expect(codes).toEqual([200, 200, 429]);
+    expect(hits).toBe(3);
+  });
+  it("bruteForce hooks lock and reset", async () => {
+    const app = Fastify({ trustProxy: true });
+    const bf = createBruteForceHooks({ maxAttempts: 2, maxAttemptsPerAccount: false });
+    app.post("/login", { preHandler: bf.preHandler, onResponse: bf.onResponse }, async (req, reply) => {
+      const ok = (req.body as { password: string }).password === "right";
+      return reply.status(ok ? 200 : 401).send({});
+    });
+    const login = (password: string) => app.inject({ method: "POST", url: "/login", payload: { email: "a@x.co", password } });
+    expect((await login("bad")).statusCode).toBe(401);
+    expect((await login("right")).statusCode).toBe(200);
+    await new Promise((r) => setTimeout(r, 10)); // onResponse reset
+    expect((await login("bad")).statusCode).toBe(401);
+    expect((await login("bad")).statusCode).toBe(401);
+    const locked = await login("right");
+    expect(locked.statusCode).toBe(429);
+    expect(locked.headers["retry-after"]).toBeDefined();
   });
 });

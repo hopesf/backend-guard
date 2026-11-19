@@ -11,14 +11,20 @@ describe("analyzeOptions", () => {
     const f = analyzeOptions({ rateLimit: true, protectHeaders: true, cors: ["https://a.com"], xss: true });
     expect(f.filter((x) => x.severity !== "info")).toEqual([]);
   });
+  it("does not nag about in-memory counters when a store is configured", () => {
+    const verbose = (o: Parameters<typeof analyzeOptions>[0]) => analyzeOptions(o).map((f) => f.id);
+    expect(verbose({ rateLimit: true })).toContain("rate-limit-memory");
+    expect(verbose({ rateLimit: { store: { hit: () => ({ count: 1, resetAt: 0 }) } } })).not.toContain("rate-limit-memory");
+  });
   it("flags cors problems", () => {
     expect(ids({ cors: true })).toContain("cors-wildcard");
     expect(ids({ cors: ["example.com"] })).toContain("cors-origin-no-scheme");
     const f = analyzeOptions({ cors: { origin: true, credentials: true } });
     expect(f.find((x) => x.id === "cors-credentials-wildcard")?.severity).toBe("error");
   });
-  it("flags ineffective blacklist entries", () => {
-    expect(ids({ ipBlacklist: ["10.0.0.0/8"] })).toContain("blacklist-cidr");
+  it("flags invalid blacklist entries, accepts CIDR", () => {
+    expect(ids({ ipBlacklist: ["10.0.0.0/8", "2001:db8::/32"] })).not.toContain("blacklist-invalid");
+    expect(ids({ ipBlacklist: ["10.0.0.0/99"] })).toContain("blacklist-invalid");
     expect(ids({ ipBlacklist: ["not-an-ip"] })).toContain("blacklist-invalid");
     expect(ids({ ipBlacklist: ["::ffff:1.2.3.4", "1.2.3.4", "2001:db8::1"] })).not.toContain("blacklist-invalid");
   });

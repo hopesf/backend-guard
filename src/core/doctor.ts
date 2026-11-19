@@ -1,6 +1,5 @@
-import { isIP } from "node:net";
 import type { BackendGuardOptions, DoctorConfig } from "../types";
-import { normalizeIp } from "./ip";
+import { createIpMatcher } from "./ip";
 import { resolveRateLimit, resolveXss } from "./options";
 
 export type Severity = "error" | "warn" | "info";
@@ -32,12 +31,12 @@ export function analyzeOptions(options: BackendGuardOptions): Finding[] {
       message: "Rate limiting is disabled: brute-force and abuse are not throttled.",
       fix: "Set `rateLimit: true` (100 req / 15 min) or an object with your own limits.",
     });
-  } else {
+  } else if (!rl.store) {
     add({
       id: "rate-limit-memory",
       severity: "info",
       message: "Rate-limit counters are kept in process memory (not shared between instances).",
-      fix: "Behind several instances use a shared store (e.g. Redis) — see the README.",
+      fix: "Behind several instances pass `rateLimit.store: new RedisRateLimitStore(redis)` (backend-guard/core).",
     });
   }
 
@@ -134,17 +133,13 @@ export function analyzeOptions(options: BackendGuardOptions): Finding[] {
   }
 
   // ── IP blacklist ──
-  for (const entry of options.ipBlacklist ?? []) {
-    if (entry.includes("/")) {
-      add({
-        id: "blacklist-cidr",
-        severity: "warn",
-        message: `ipBlacklist entry "${entry}" looks like a CIDR range; only exact IPs are supported, so it blocks nothing.`,
-        fix: "List individual IPs (CIDR support is planned).",
-      });
-    } else if (isIP(normalizeIp(entry)) === 0) {
-      add({ id: "blacklist-invalid", severity: "warn", message: `ipBlacklist entry "${entry}" is not a valid IP address and will never match.` });
-    }
+  for (const entry of createIpMatcher(options.ipBlacklist ?? []).invalid) {
+    add({
+      id: "blacklist-invalid",
+      severity: "warn",
+      message: `ipBlacklist entry "${entry}" is not a valid IP address or CIDR range and will never match.`,
+      fix: 'Use an IP ("1.2.3.4", "2001:db8::1") or a range ("10.0.0.0/8").',
+    });
   }
 
   return out;

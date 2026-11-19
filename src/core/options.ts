@@ -77,7 +77,9 @@ export function validateOptions(options: unknown): asserts options is BackendGua
   const { rateLimit, cors, protectHeaders, xss, requestLogging, ipBlacklist, doctor, noSqlInjection, parameterPollution, safeErrors } = options;
 
   if (boolOrObj("rateLimit", rateLimit) && isObj(rateLimit)) {
-    const { windowMs, limit, statusCode, message } = rateLimit;
+    const { windowMs, limit, statusCode, message, store } = rateLimit;
+    if (store !== undefined && !(isObj(store) && typeof store.hit === "function"))
+      problems.push("rateLimit.store must be an object with a hit(key, windowMs) method (see RedisRateLimitStore)");
     if (windowMs !== undefined && !(typeof windowMs === "number" && Number.isFinite(windowMs) && windowMs > 0))
       problems.push("rateLimit.windowMs must be a positive number (milliseconds)");
     if (limit !== undefined && !(typeof limit === "number" && Number.isInteger(limit) && limit > 0))
@@ -152,7 +154,7 @@ export function validateOptions(options: unknown): asserts options is BackendGua
 
 // ── Resolvers: turn `true | object` shorthand into fully-populated config ──
 
-export function resolveRateLimit(option: BackendGuardOptions["rateLimit"]): Required<RateLimitConfig> | null {
+export function resolveRateLimit(option: BackendGuardOptions["rateLimit"]): (Required<Omit<RateLimitConfig, "store">> & { store?: RateLimitConfig["store"] }) | null {
   if (!option) return null;
   return { ...DEFAULT_RATE_LIMIT, ...(option === true ? {} : (option as RateLimitConfig)) };
 }
