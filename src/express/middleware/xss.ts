@@ -1,47 +1,21 @@
-import xssFilter from "xss";
 import type { Request, Response, NextFunction, RequestHandler } from "express";
 import type { BackendGuardOptions, XssConfig } from "../../types";
+import { sanitize } from "../../shared/sanitize";
 
 /**
- * Recursively sanitizes all string values of an object against XSS.
+ * Creates the XSS sanitization middleware.
  *
- * How XSS (Cross-Site Scripting) attacks work:
- * An attacker enters `<script>document.cookie</script>` in a form field.
- * This data is saved to the database and when shown to another user,
- * the script executes and steals their cookies.
+ * Sanitizes string values in req.body, req.query and req.params with the
+ * `xss` package. NOTE: this is input *sanitization*, not a replacement for
+ * context-aware output encoding when rendering user data.
  *
- * This function sanitizes all string values using xss():
- * `<script>alert('xss')</script>` → `&lt;script&gt;alert('xss')&lt;/script&gt;`
- */
-function sanitize(obj: unknown): unknown {
-  if (typeof obj === "string") {
-    return xssFilter(obj);
-  }
-
-  if (Array.isArray(obj)) {
-    return obj.map(sanitize);
-  }
-
-  if (obj !== null && typeof obj === "object") {
-    const result: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(obj)) {
-      result[key] = sanitize(value);
-    }
-    return result;
-  }
-
-  // number, boolean, null, undefined → returned as-is
-  return obj;
-}
-
-/**
- * Creates the XSS protection middleware.
- *
- * Sanitizes all string values in req.body, req.query and req.params
- * from malicious HTML/script tags.
- *
- * Note: We write our own middleware since xss-clean is deprecated.
- * Uses the `xss` package under the hood.
+ * Express specifics:
+ * - `req.body`   → mount this AFTER `express.json()` / `express.urlencoded()`.
+ * - `req.query`  → in Express 5 this is a getter that re-parses the URL on
+ *                  every access, so we shadow it on the request instance.
+ * - `req.params` → Express assigns `req.params` per matched route *after*
+ *                  this middleware ran, so we install an accessor whose
+ *                  setter sanitizes whatever Express assigns later.
  */
 export function createXssMiddleware(
   option: BackendGuardOptions["xss"]
@@ -55,13 +29,24 @@ export function createXssMiddleware(
     }
 
     if (config.query !== false && req.query) {
-      Object.keys(req.query).forEach((key) => {
-        (req.query as Record<string, unknown>)[key] = sanitize(req.query[key]);
+      Object.defineProperty(req, "query", {
+        value: sanitize(req.query),
+        configurable: true,
+        writable: true,
+        enumerable: true,
       });
     }
 
-    if (config.params !== false && req.params) {
-      req.params = sanitize(req.params) as typeof req.params;
+    if (config.params !== false) {
+      let current: unknown = sanitize(req.params ?? {});
+      Object.defineProperty(req, "params", {
+        configurable: true,
+        enumerable: true,
+        get: () => current,
+        set: (value: unknown) => {
+          current = sanitize(value);
+        },
+      });
     }
 
     next();

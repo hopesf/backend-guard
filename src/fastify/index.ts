@@ -157,3 +157,5 @@ export function backendGuardFastify(options: BackendGuardOptions = {}): FastifyP
   // all hooks and plugin registrations apply globally to every route.
   return fp(plugin, { fastify: ">=4.0.0", name: "backend-guard" });
 }
+
+export type { BackendGuardOptions, RateLimitConfig, XssConfig, RequestLoggingConfig } from "../types";

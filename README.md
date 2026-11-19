@@ -1,6 +1,6 @@
 # 🛡️ Backend Guard
 
-All-in-one security middleware for **Express.js**, **Fastify**, and **NestJS**. Stop installing 6 packages — one config, full protection.
+All-in-one security middleware for **Express.js**, **Fastify**, and **NestJS**. One config for headers, CORS, rate limiting, XSS sanitization, request logging and IP blocking.
 
 [![npm version](https://img.shields.io/npm/v/backend-guard.svg)](https://www.npmjs.com/package/backend-guard)
 [![npm downloads](https://img.shields.io/npm/dw/backend-guard.svg)](https://www.npmjs.com/package/backend-guard)
@@ -12,10 +12,10 @@ All-in-one security middleware for **Express.js**, **Fastify**, and **NestJS**. 
 Every Express or Fastify project needs these security packages:
 
 ```bash
-npm i helmet cors express-rate-limit xss-clean joi zod
+npm i helmet cors express-rate-limit xss
 ```
 
-Then you configure each one separately, manage 6 dependencies, read 6 docs...
+Then you configure each one separately, manage several dependencies, read several docs...
 
 ## The Solution
 
@@ -27,7 +27,7 @@ npm i backend-guard
 
 ```ts
 import express from "express";
-import { backendGuard } from "backend-guard";
+import { backendGuard } from "backend-guard/express";
 
 const app = express();
 
@@ -45,7 +45,7 @@ app.use(backendGuard({
 
 ```ts
 import Fastify from "fastify";
-import { backendGuardFastify } from "backend-guard";
+import { backendGuardFastify } from "backend-guard/fastify";
 
 const fastify = Fastify({ trustProxy: true });
 
@@ -72,7 +72,7 @@ start();
 
 ```ts
 import { Module } from "@nestjs/common";
-import { BackendGuardModule } from "backend-guard";
+import { BackendGuardModule } from "backend-guard/nestjs";
 
 @Module({
   imports: [
@@ -105,13 +105,6 @@ npm install backend-guard
 npm install express
 ```
 
-For input validation (optional):
-
-```bash
-npm install zod   # and/or
-npm install joi
-```
-
 ### Peer Dependencies — Fastify
 
 ```bash
@@ -142,6 +135,26 @@ npm install @nestjs/platform-express
 
 > `helmet` and `cors` (already bundled) are applied as middleware on the Express adapter.  
 > The rate limiter, IP blacklist, XSS protection and request logger use NestJS Guards/Interceptors and work with **both** Express and Fastify adapters.
+
+---
+
+## Entry points
+
+| Import | Use for | Needs |
+|--------|---------|-------|
+| `backend-guard` or `backend-guard/express` | Express | `express` |
+| `backend-guard/fastify` | Fastify | `fastify`, `fastify-plugin` (+ `@fastify/*` plugins you enable) |
+| `backend-guard/nestjs` | NestJS | `@nestjs/common`, `@nestjs/core`, `rxjs` |
+
+Each entry loads only its own framework, so installing one framework never requires the others.
+
+## Security notes (read this)
+
+- **Behind a proxy?** Set `trust proxy` (Express/Nest) or `trustProxy` (Fastify) correctly. Without it every client shares the proxy's IP (rate limit and blacklist break); with a too-permissive value clients can spoof `X-Forwarded-For` and evade both.
+- **`xss` is input sanitization**, not a substitute for context-aware output encoding. It cleans HTML in strings, so fields that legitimately contain `<`/`>` (e.g. passwords) may be altered; scope it with `xss: { body: false, ... }` or per-route use if needed. Mount it **after** `express.json()`.
+- **Rate limiting is per process** (in memory). For several instances use a shared store (e.g. Redis via `express-rate-limit` stores, `@fastify/rate-limit` `redis` option).
+- **IP blacklist** matches exact addresses (IPv4-mapped IPv6 such as `::ffff:1.2.3.4` is normalized). CIDR ranges are not supported yet.
+- **Request logging** prints the full URL including the query string; do not put secrets in query strings, or supply your own `logger` that redacts them.
 
 ---
 
@@ -220,74 +233,6 @@ app.use(backendGuard({
 }));
 ```
 
-### Input Validation with Zod
-
-**Express:**
-
-```ts
-import { createValidator } from "backend-guard";
-import { z } from "zod";
-
-const userSchema = z.object({
-  name: z.string().min(2),
-  email: z.string().email(),
-  age: z.number().int().min(0),
-});
-
-app.post("/users", createValidator(userSchema), (req, res) => {
-  // req.body is validated and typed
-  res.json({ user: req.body });
-});
-```
-
-**Fastify:**
-
-```ts
-import { createFastifyValidator } from "backend-guard";
-import { z } from "zod";
-
-const userSchema = z.object({
-  name: z.string().min(2),
-  email: z.string().email(),
-  age: z.number().int().min(0),
-});
-
-fastify.post("/users", {
-  preHandler: [createFastifyValidator(userSchema)],
-}, async (request) => {
-  return { user: request.body };
-});
-```
-
-### Input Validation with Joi
-
-```ts
-import { createValidator } from "backend-guard"; // Express
-// import { createFastifyValidator } from "backend-guard"; // Fastify
-import Joi from "joi";
-
-const loginSchema = Joi.object({
-  email: Joi.string().email().required(),
-  password: Joi.string().min(8).required(),
-});
-
-app.post("/login", createValidator(loginSchema), (req, res) => {
-  res.json({ message: "Login successful" });
-});
-```
-
-Validation errors return `400 Bad Request`:
-
-```json
-{
-  "error": "Validation Error",
-  "details": [
-    { "field": "email", "message": "Invalid email" },
-    { "field": "password", "message": "String must contain at least 8 character(s)" }
-  ]
-}
-```
-
 ### Request Logging
 
 ```ts
@@ -315,7 +260,7 @@ app.use(backendGuard({
 ```ts
 // app.module.ts
 import { Module } from "@nestjs/common";
-import { BackendGuardModule } from "backend-guard";
+import { BackendGuardModule } from "backend-guard/nestjs";
 
 @Module({
   imports: [
@@ -358,12 +303,12 @@ import {
   XssInterceptor,
   RequestLoggingInterceptor,
   BACKEND_GUARD_OPTIONS,
-} from "backend-guard";
+} from "backend-guard/nestjs";
 ```
 
 ### Rate Limiter
 
-The built-in `RateLimitGuard` uses an **in-memory store** (per process). For multi-instance / Redis-backed rate limiting, use [@nestjs/throttler](https://docs.nestjs.com/security/rate-limiting) alongside or instead.
+The built-in `RateLimitGuard` uses an **in-memory store** (per process; expired entries are swept automatically). For multi-instance / Redis-backed rate limiting, use [@nestjs/throttler](https://docs.nestjs.com/security/rate-limiting) alongside or instead.
 
 ### main.ts Bootstrap
 
@@ -393,8 +338,7 @@ import {
   createXssMiddleware,
   createRequestLoggingMiddleware,
   createIpBlacklistMiddleware,
-  createValidator,
-} from "backend-guard";
+} from "backend-guard/express";
 
 app.use(createRateLimitMiddleware({ windowMs: 60000, limit: 30 }));
 app.use(createHelmetMiddleware(true));
@@ -414,7 +358,6 @@ Backend Guard wraps these battle-tested packages:
 | CORS | [cors](https://www.npmjs.com/package/cors) |
 | Rate Limiting | [express-rate-limit](https://www.npmjs.com/package/express-rate-limit) |
 | XSS Protection | [xss](https://www.npmjs.com/package/xss) |
-| Validation | [zod](https://www.npmjs.com/package/zod) / [joi](https://www.npmjs.com/package/joi) |
 
 ### Fastify
 
@@ -424,7 +367,6 @@ Backend Guard wraps these battle-tested packages:
 | CORS | [@fastify/cors](https://www.npmjs.com/package/@fastify/cors) |
 | Rate Limiting | [@fastify/rate-limit](https://www.npmjs.com/package/@fastify/rate-limit) |
 | XSS Protection | [xss](https://www.npmjs.com/package/xss) |
-| Validation | [zod](https://www.npmjs.com/package/zod) / [joi](https://www.npmjs.com/package/joi) |
 
 ### NestJS
 
@@ -458,7 +400,7 @@ app.use(backendGuard(config));
 The same `BackendGuardOptions` type is shared across Express, Fastify, and NestJS:
 
 ```ts
-import { backendGuardFastify, type BackendGuardOptions } from "backend-guard";
+import { backendGuardFastify, type BackendGuardOptions } from "backend-guard/fastify";
 
 const config: BackendGuardOptions = {
   protectHeaders: true,
@@ -470,7 +412,7 @@ await fastify.register(backendGuardFastify(config));
 ```
 
 ```ts
-import { BackendGuardModule, type BackendGuardOptions } from "backend-guard";
+import { BackendGuardModule, type BackendGuardOptions } from "backend-guard/nestjs";
 
 const config: BackendGuardOptions = {
   protectHeaders: true,
@@ -484,6 +426,15 @@ BackendGuardModule.forRoot(config);
 ---
 
 ## Changelog
+
+### v1.4.0
+- **Fix:** `require("backend-guard")` no longer crashes when optional Fastify/Nest peers are not installed. **Breaking:** Fastify and NestJS exports moved to `backend-guard/fastify` and `backend-guard/nestjs`.
+- **Fix:** Express `xss` now actually sanitizes `req.query` and `req.params` (Express 5 getters).
+- **Fix:** IP blacklist now matches IPv4-mapped IPv6 addresses (`::ffff:1.2.3.4`); Fastify hook returns the reply properly.
+- **Fix:** Nest `RateLimitGuard` no longer leaks memory (expired entries are swept).
+- `xss` sanitizer drops `__proto__` keys.
+- **Breaking:** removed the `validate` option and `createValidator` / `createFastifyValidator` — use Zod/Joi directly (or Fastify's built-in schemas).
+- Added test suite (Vitest), CI, dependency updates (`npm audit` clean).
 
 ### v1.3.0
 - Added full **NestJS** support via `BackendGuardModule.forRoot()`

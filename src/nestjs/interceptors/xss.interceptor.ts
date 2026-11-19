@@ -6,36 +6,10 @@ import {
   NestInterceptor,
 } from "@nestjs/common";
 import { Observable } from "rxjs";
-import xssFilter from "xss";
 
 import type { BackendGuardOptions, XssConfig } from "../../types";
 import { BACKEND_GUARD_OPTIONS } from "../nestjs.constants";
-
-/**
- * Recursively sanitizes all string values in an object against XSS.
- *
- * `<script>alert('xss')</script>` → `&lt;script&gt;alert('xss')&lt;/script&gt;`
- */
-function sanitize(obj: unknown): unknown {
-  if (typeof obj === "string") {
-    return xssFilter(obj);
-  }
-
-  if (Array.isArray(obj)) {
-    return obj.map(sanitize);
-  }
-
-  if (obj !== null && typeof obj === "object") {
-    const result: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(obj)) {
-      result[key] = sanitize(value);
-    }
-    return result;
-  }
-
-  // number, boolean, null, undefined → returned as-is
-  return obj;
-}
+import { sanitize } from "../../shared/sanitize";
 
 /**
  * Interceptor that sanitizes req.body, req.query and req.params against XSS.

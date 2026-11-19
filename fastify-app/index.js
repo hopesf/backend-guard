@@ -1,6 +1,5 @@
 const Fastify = require("fastify");
-const { backendGuardFastify, createFastifyValidator } = require("backend-guard");
-const { z } = require("zod");
+const { backendGuardFastify } = require("backend-guard/fastify");
 
 const fastify = Fastify({ logger: false, trustProxy: true });
 
@@ -28,19 +27,6 @@ async function start() {
     message: "XSS sanitization applied",
     received: request.body,
   }));
-
-  // Test 3: Zod validation
-  const userSchema = z.object({
-    name: z.string().min(2),
-    email: z.string().email(),
-    age: z.number().int().min(18),
-  });
-
-  fastify.post(
-    "/users",
-    { preHandler: [createFastifyValidator(userSchema)] },
-    async (request) => ({ message: "User created", user: request.body })
-  );
 
   await fastify.listen({ port: 3001 });
   console.log("Fastify test app running at http://localhost:3001");

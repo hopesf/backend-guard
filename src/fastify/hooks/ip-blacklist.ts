@@ -1,4 +1,5 @@
 import type { FastifyRequest, FastifyReply } from "fastify";
+import { buildIpSet, normalizeIp } from "../../shared/ip";
 
 /**
  * Creates a Fastify onRequest hook for IP blacklist checking.
@@ -12,13 +13,14 @@ import type { FastifyRequest, FastifyReply } from "fastify";
  */
 export function createIpBlacklistHook(blacklist: string[]) {
   // Set for O(1) lookup — much faster than Array.includes() for large lists
-  const blockedIps = new Set(blacklist);
+  const blockedIps = buildIpSet(blacklist);
 
-  return async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
-    const clientIp = request.ip || "";
+  return async (request: FastifyRequest, reply: FastifyReply): Promise<FastifyReply | void> => {
+    const clientIp = normalizeIp(request.ip);
 
     if (blockedIps.has(clientIp)) {
-      reply.status(403).send({
+      // `return reply` tells Fastify the response was already sent
+      return reply.status(403).send({
         error: "Forbidden",
         message: "Your IP address has been blocked.",
       });

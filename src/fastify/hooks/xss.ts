@@ -1,24 +1,6 @@
-import xssFilter from "xss";
 import type { FastifyRequest, FastifyReply } from "fastify";
 import type { BackendGuardOptions, XssConfig } from "../../types";
-
-/**
- * Recursively sanitizes all string values of an object against XSS.
- * Same logic as the Express XSS middleware — shared sanitizer function.
- */
-function sanitize(obj: unknown): unknown {
-  if (typeof obj === "string") return xssFilter(obj);
-  if (Array.isArray(obj)) return obj.map(sanitize);
-  if (obj !== null && typeof obj === "object") {
-    const result: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(obj)) {
-      result[key] = sanitize(value);
-    }
-    return result;
-  }
-  // number, boolean, null, undefined → returned as-is
-  return obj;
-}
+import { sanitize } from "../../shared/sanitize";
 
 /**
  * Creates a Fastify preHandler hook for XSS sanitization.

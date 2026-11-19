@@ -98,12 +98,4 @@ export interface BackendGuardOptions {
    * IP blacklist — requests from these IPs will be rejected with 403.
    */
   ipBlacklist?: string[];
-
-  /**
-   * Validation library preference.
-   * Used with the createValidator() helper.
-   * - "zod" → Zod schema validation
-   * - "joi" → Joi schema validation
-   */
-  validate?: "zod" | "joi";
 }

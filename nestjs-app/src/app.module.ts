@@ -1,5 +1,5 @@
 import { Module } from "@nestjs/common";
-import { BackendGuardModule } from "backend-guard";
+import { BackendGuardModule } from "backend-guard/nestjs";
 import { AppController } from "./app.controller";
 
 @Module({

@@ -82,3 +82,20 @@ export function backendGuard(options: BackendGuardOptions = {}): RequestHandler 
 
   return router as unknown as RequestHandler;
 }
+
+export { backendGuard as default };
+
+// Individual Express middleware factories
+export { createHelmetMiddleware } from "./middleware/helmet";
+export { createCorsMiddleware } from "./middleware/cors";
+export { createRateLimitMiddleware } from "./middleware/rate-limit";
+export { createXssMiddleware } from "./middleware/xss";
+export { createRequestLoggingMiddleware } from "./middleware/request-logger";
+export { createIpBlacklistMiddleware } from "./middleware/ip-blacklist";
+
+export type {
+  BackendGuardOptions,
+  RateLimitConfig,
+  XssConfig,
+  RequestLoggingConfig,
+} from "../types";
