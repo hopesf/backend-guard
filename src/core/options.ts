@@ -22,6 +22,9 @@ const KNOWN_KEYS = [
   "xss",
   "requestLogging",
   "ipBlacklist",
+  "noSqlInjection",
+  "parameterPollution",
+  "safeErrors",
   "doctor",
 ] as const;
 
@@ -71,7 +74,7 @@ export function validateOptions(options: unknown): asserts options is BackendGua
     return true;
   };
 
-  const { rateLimit, cors, protectHeaders, xss, requestLogging, ipBlacklist, doctor } = options;
+  const { rateLimit, cors, protectHeaders, xss, requestLogging, ipBlacklist, doctor, noSqlInjection, parameterPollution, safeErrors } = options;
 
   if (boolOrObj("rateLimit", rateLimit) && isObj(rateLimit)) {
     const { windowMs, limit, statusCode, message } = rateLimit;
@@ -111,6 +114,30 @@ export function validateOptions(options: unknown): asserts options is BackendGua
     if (redactQuery !== undefined && typeof redactQuery !== "boolean" &&
         !(Array.isArray(redactQuery) && redactQuery.every((k) => typeof k === "string")))
       problems.push("requestLogging.redactQuery must be a boolean or a string[]");
+  }
+
+  if (boolOrObj("noSqlInjection", noSqlInjection) && isObj(noSqlInjection)) {
+    if (noSqlInjection.mode !== undefined && noSqlInjection.mode !== "reject" && noSqlInjection.mode !== "strip")
+      problems.push('noSqlInjection.mode must be "reject" or "strip"');
+    for (const k of ["body", "query", "dots"]) {
+      if (noSqlInjection[k] !== undefined && typeof noSqlInjection[k] !== "boolean")
+        problems.push(`noSqlInjection.${k} must be a boolean`);
+    }
+  }
+
+  if (boolOrObj("parameterPollution", parameterPollution) && isObj(parameterPollution)) {
+    const { whitelist, keep } = parameterPollution;
+    if (whitelist !== undefined && (!Array.isArray(whitelist) || whitelist.some((w) => typeof w !== "string")))
+      problems.push("parameterPollution.whitelist must be a string[]");
+    if (keep !== undefined && keep !== "first" && keep !== "last")
+      problems.push('parameterPollution.keep must be "first" or "last"');
+  }
+
+  if (boolOrObj("safeErrors", safeErrors) && isObj(safeErrors)) {
+    if (safeErrors.expose4xx !== undefined && typeof safeErrors.expose4xx !== "boolean")
+      problems.push("safeErrors.expose4xx must be a boolean");
+    if (safeErrors.logger !== undefined && typeof safeErrors.logger !== "function")
+      problems.push("safeErrors.logger must be a function");
   }
 
   if (ipBlacklist !== undefined &&

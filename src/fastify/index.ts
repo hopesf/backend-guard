@@ -7,6 +7,8 @@ import type { HelmetOptions } from "helmet";
 import { createIpBlacklistHook } from "./hooks/ip-blacklist";
 import { createXssHook } from "./hooks/xss";
 import { createRequestLoggingHook } from "./hooks/request-logger";
+import { createHppHook, createNoSqlHook } from "./hooks/input";
+import { resolveSafeErrors, toSafeError } from "../core/errors";
 import { resolveRateLimit } from "../core/options";
 import { validateOptions } from "../core/options";
 import { createProxyWatcher, reportAtStartup } from "../core/doctor";
@@ -152,6 +154,24 @@ export function backendGuardFastify(options: BackendGuardOptions = {}): FastifyP
       const mod = requireOptional(co, "@fastify/cors");
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await fastify.register(getDefault(mod) as any, buildCorsOpts(options.cors as true | string[] | CorsOptions) as any);
+    }
+
+    // 5a/5b. Parameter pollution, then NoSQL operator check (before XSS sees the data)
+    if (options.parameterPollution) {
+      fastify.addHook("preHandler", createHppHook(options.parameterPollution));
+    }
+    if (options.noSqlInjection) {
+      fastify.addHook("preHandler", createNoSqlHook(options.noSqlInjection));
+    }
+
+    // 5c. Safe error responses (no stack traces / internals)
+    const safe = resolveSafeErrors(options.safeErrors);
+    if (safe) {
+      fastify.setErrorHandler((err, _request, reply) => {
+        safe.logger(err);
+        const { status, body } = toSafeError(err, safe);
+        return reply.status(status).send(body);
+      });
     }
 
     // 5. XSS sanitization (preHandler — after body parsing, before the route handler)

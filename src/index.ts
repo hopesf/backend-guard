@@ -18,4 +18,7 @@ export type {
   XssConfig,
   RequestLoggingConfig,
   DoctorConfig,
+  NoSqlConfig,
+  ParameterPollutionConfig,
+  SafeErrorsConfig,
 } from "./types";

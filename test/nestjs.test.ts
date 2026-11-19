@@ -61,6 +61,21 @@ describe("nestjs adapter", () => {
   });
 });
 
+describe("nestjs input hardening", () => {
+  it("rejects operator keys and collapses repeated params", async () => {
+    const a = await makeApp({ noSqlInjection: true, parameterPollution: true });
+    expect((await request(a.getHttpServer()).post("/b").send({ e: { $ne: null } })).status).toBe(400);
+    expect((await request(a.getHttpServer()).get("/q?e[$gt]=1")).status).toBe(400);
+    const res = await request(a.getHttpServer()).get("/q?role=user&role=admin");
+    expect(res.body.query.role).toBe("admin");
+  });
+  it("strip mode removes operators", async () => {
+    const a = await makeApp({ noSqlInjection: { mode: "strip" } });
+    const res = await request(a.getHttpServer()).post("/b").send({ e: { $ne: null }, ok: 1 });
+    expect(res.body.body).toEqual({ e: {}, ok: 1 });
+  });
+});
+
 describe("RateLimitGuard memory", () => {
   it("sweeps expired records", async () => {
     const guard = new RateLimitGuard({ rateLimit: { limit: 5, windowMs: 20 } });

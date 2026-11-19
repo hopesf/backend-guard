@@ -3,6 +3,8 @@ import { validateOptions, BackendGuardConfigError } from "../src/core/options";
 import { redactUrl, formatLogLine } from "../src/core/logger";
 import { MemoryStore, RateLimiter } from "../src/core/rate-limit";
 import { resolveLogging } from "../src/core/options";
+import { findOperatorKeys, stripOperatorKeys, applyHpp, resolveHpp } from "../src/core/input";
+import { toSafeError, resolveSafeErrors } from "../src/core/errors";
 
 describe("validateOptions", () => {
   it("accepts valid configs", () => {
@@ -55,5 +57,42 @@ describe("RateLimiter", () => {
   it("supports async stores", async () => {
     const rl = new RateLimiter(1000, 1, { hit: async () => ({ count: 2, resetAt: Date.now() + 1000 }) });
     expect(await rl.allow("x")).toBe(false);
+  });
+});
+
+describe("input helpers", () => {
+  it("finds operator keys at any depth, including arrays", () => {
+    expect(findOperatorKeys({ a: { $ne: 1 }, b: [{ $gt: 2 }], c: "$ne" })).toEqual(["a.$ne", "b[0].$gt"]);
+    expect(findOperatorKeys({ "e[$gt]": "1" })).toEqual(["e[$gt]"]);
+    expect(findOperatorKeys({ "a.b": 1 })).toEqual([]);
+    expect(findOperatorKeys({ "a.b": 1 }, true)).toEqual(["a.b"]);
+  });
+  it("flags absurd nesting instead of overflowing the stack", () => {
+    let deep: Record<string, unknown> = {};
+    for (let i = 0; i < 100; i++) deep = { n: deep };
+    expect(findOperatorKeys(deep).some((p) => p.includes("too deep"))).toBe(true);
+  });
+  it("strips operators and __proto__", () => {
+    const parsed = JSON.parse('{"a":{"$ne":1,"k":2},"__proto__":{"x":1}}');
+    expect(stripOperatorKeys(parsed)).toEqual({ a: { k: 2 } });
+  });
+  it("applyHpp respects whitelist and object values", () => {
+    const cfg = resolveHpp({ whitelist: ["t"] })!;
+    expect(applyHpp({ r: ["a", "b"], t: ["x", "y"], o: [{ k: 1 }] }, cfg)).toEqual({ r: "b", t: ["x", "y"], o: [{ k: 1 }] });
+  });
+});
+
+describe("toSafeError", () => {
+  const cfg = resolveSafeErrors(true)!;
+  it("hides 5xx details, keeps 4xx messages", () => {
+    expect(toSafeError(new Error("secret"), cfg).body.message).toBe("Something went wrong.");
+    expect(toSafeError({ status: 404, message: "no such user" }, cfg)).toEqual({ status: 404, body: { error: "Not Found", message: "no such user" } });
+  });
+  it("can hide 4xx messages too", () => {
+    const c = resolveSafeErrors({ expose4xx: false })!;
+    expect(toSafeError({ status: 400, message: "field x" }, c).body.message).toBe("Bad Request");
+  });
+  it("ignores bogus status values", () => {
+    expect(toSafeError({ status: 99999 }, cfg).status).toBe(500);
   });
 });

@@ -47,6 +47,11 @@ describe("scanProject", () => {
     write("app.js", 'app.set("trust proxy", 1);\napp.use(backendGuard({ rateLimit: true }));');
     expect(ids()).toEqual([]);
   });
+  it("flags request data passed into Mongo queries", () => {
+    write("package.json", JSON.stringify({ dependencies: { mongoose: "8" } }));
+    write("r.js", "const u = await User.findOne(req.body);");
+    expect(ids()).toContain("nosql-injection-risk");
+  });
   it("notes missing trust proxy when rate limiting is used", () => {
     write("package.json", JSON.stringify({ dependencies: { "express-rate-limit": "8" } }));
     write("a.js", "x");

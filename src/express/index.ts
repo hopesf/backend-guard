@@ -11,6 +11,7 @@ import { createRateLimitMiddleware } from "./middleware/rate-limit";
 import { createXssMiddleware } from "./middleware/xss";
 import { createRequestLoggingMiddleware } from "./middleware/request-logger";
 import { createIpBlacklistMiddleware } from "./middleware/ip-blacklist";
+import { createHppMiddleware, createNoSqlMiddleware } from "./middleware/input";
 import { validateOptions } from "../core/options";
 import { createProxyWatcher, reportAtStartup } from "../core/doctor";
 
@@ -83,6 +84,14 @@ export function backendGuard(options: BackendGuardOptions = {}): RequestHandler 
     router.use(createCorsMiddleware(options.cors));
   }
 
+  // 5a. Parameter pollution → 5b. NoSQL operators (run before XSS so checks see raw keys)
+  if (options.parameterPollution) {
+    router.use(createHppMiddleware(options.parameterPollution));
+  }
+  if (options.noSqlInjection) {
+    router.use(createNoSqlMiddleware(options.noSqlInjection));
+  }
+
   // 5. XSS protection
   if (options.xss) {
     router.use(createXssMiddleware(options.xss));
@@ -104,6 +113,7 @@ export { createHelmetMiddleware } from "./middleware/helmet";
 export { createCorsMiddleware } from "./middleware/cors";
 export { createRateLimitMiddleware } from "./middleware/rate-limit";
 export { createXssMiddleware } from "./middleware/xss";
+export { createHppMiddleware, createNoSqlMiddleware, backendGuardErrors } from "./middleware/input";
 export { createRequestLoggingMiddleware } from "./middleware/request-logger";
 export { createIpBlacklistMiddleware } from "./middleware/ip-blacklist";
 
@@ -112,4 +122,7 @@ export type {
   RateLimitConfig,
   XssConfig,
   RequestLoggingConfig,
+  NoSqlConfig,
+  ParameterPollutionConfig,
+  SafeErrorsConfig,
 } from "../types";

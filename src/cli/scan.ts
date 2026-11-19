@@ -110,6 +110,12 @@ export function scanProject(root: string): ScanFinding[] {
       if (!/httpOnly/i.test(m[0])) add("cookie-httponly", "warn", "res.cookie() without httpOnly (and likely secure/sameSite).", m.index!);
     }
 
+    // NoSQL injection: request data passed straight into a query
+    if (has("mongoose", "mongodb") && !testFile) {
+      const q = /\.(find|findOne|findOneAndUpdate|findOneAndDelete|updateOne|updateMany|deleteOne|deleteMany|countDocuments)\(\s*(req|request)\.(body|query)\b/.exec(text);
+      if (q) add("nosql-injection-risk", "warn", "Request data is passed directly into a MongoDB query; `{ \"$ne\": null }` style payloads can bypass filters. Validate input or enable backend-guard `noSqlInjection`.", q.index);
+    }
+
     // TLS verification off
     const tls = /rejectUnauthorized\s*:\s*false|NODE_TLS_REJECT_UNAUTHORIZED\s*=\s*["']?0/.exec(text);
     if (tls && !testFile) add("tls-verify-off", "error", "TLS certificate verification is disabled.", tls.index);

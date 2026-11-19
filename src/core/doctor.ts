@@ -104,6 +104,25 @@ export function analyzeOptions(options: BackendGuardOptions): Finding[] {
     }
   }
 
+  // ── input hardening ──
+  if (!options.noSqlInjection) {
+    add({
+      id: "nosql-off",
+      severity: "info",
+      message: "NoSQL operator injection protection is off (matters if you use MongoDB-style queries with request data).",
+      fix: "Set `noSqlInjection: true` to reject `$`-operator keys in body/query.",
+    });
+  } else if (isObj(options.noSqlInjection)) {
+    const n = options.noSqlInjection as Record<string, unknown>;
+    if (n.body === false && n.query === false)
+      add({ id: "nosql-noop", severity: "warn", message: "`noSqlInjection` is enabled but body and query are both disabled — nothing is checked." });
+    if (n.mode === "strip")
+      add({ id: "nosql-strip", severity: "info", message: 'noSqlInjection mode "strip" silently alters input; "reject" (default) makes attacks visible.' });
+  }
+  if (!options.parameterPollution) {
+    add({ id: "hpp-off", severity: "info", message: "HTTP parameter pollution protection is off (repeated query parameters arrive as arrays).", fix: "Set `parameterPollution: true`." });
+  }
+
   // ── logging ──
   if (isObj(options.requestLogging) && options.requestLogging.redactQuery === false) {
     add({
@@ -141,6 +160,9 @@ export function summarize(options: BackendGuardOptions): string {
   if (rl) parts.push(`rate-limit(${rl.limit}/${Math.round(rl.windowMs / 1000)}s)`);
   if (x) parts.push("xss");
   if (options.requestLogging) parts.push("logging");
+  if (options.noSqlInjection) parts.push("nosql");
+  if (options.parameterPollution) parts.push("hpp");
+  if (options.safeErrors) parts.push("safe-errors");
   if (options.ipBlacklist?.length) parts.push(`blacklist(${options.ipBlacklist.length})`);
   return parts.length ? parts.join(", ") : "nothing enabled";
 }

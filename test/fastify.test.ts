@@ -62,3 +62,36 @@ describe("fastify adapter", () => {
     expect(p.json().params.x).not.toContain("<script>");
   });
 });
+
+describe("fastify input hardening", () => {
+  it("noSqlInjection rejects operator keys (handler not reached)", async () => {
+    const app = await makeApp({ noSqlInjection: true });
+    expect((await app.inject({ method: "POST", url: "/b", payload: { e: { $ne: null } } })).statusCode).toBe(400);
+    expect((await app.inject({ url: "/q?e[$gt]=1" })).statusCode).toBe(400); // flat `e[$gt]` key is flagged too
+    expect((await app.inject({ method: "POST", url: "/b", payload: { e: "x" } })).statusCode).toBe(200);
+  });
+  it("strip mode removes operators from the body", async () => {
+    const app = await makeApp({ noSqlInjection: { mode: "strip" } });
+    const res = await app.inject({ method: "POST", url: "/b", payload: { e: { $ne: null }, ok: 1 } });
+    expect(res.json().body).toEqual({ e: {}, ok: 1 });
+  });
+  it("parameterPollution collapses repeated params", async () => {
+    const app = await makeApp({ parameterPollution: { whitelist: ["tags"] } });
+    const res = await app.inject({ url: "/q?role=user&role=admin&tags=a&tags=b" });
+    expect(res.json().query).toEqual({ role: "admin", tags: ["a", "b"] });
+  });
+  it("safeErrors returns generic 500s and keeps 4xx messages", async () => {
+    const logged: unknown[] = [];
+    const app = Fastify();
+    await app.register(backendGuardFastify({ safeErrors: { logger: (e) => logged.push(e) } }));
+    app.get("/boom", async () => { throw new Error("secret db host"); });
+    app.get("/bad", async () => { throw Object.assign(new Error("name required"), { statusCode: 400 }); });
+    const boom = await app.inject({ url: "/boom" });
+    expect(boom.statusCode).toBe(500);
+    expect(boom.body).not.toContain("secret");
+    const bad = await app.inject({ url: "/bad" });
+    expect(bad.statusCode).toBe(400);
+    expect(bad.json().message).toBe("name required");
+    expect(logged).toHaveLength(2);
+  });
+});

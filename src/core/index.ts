@@ -6,3 +6,5 @@ export type { Finding, Severity } from "./doctor";
 export { MemoryStore, RateLimiter } from "./rate-limit";
 export type { RateLimitStore, HitResult } from "./rate-limit";
 export { redactUrl } from "./logger";
+export { findOperatorKeys, stripOperatorKeys, applyHpp } from "./input";
+export { toSafeError } from "./errors";

@@ -202,6 +202,9 @@ Both `backendGuard()` (Express) and `backendGuardFastify()` (Fastify) accept the
 | `xss` | `boolean \| XssConfig` | `false` | XSS sanitization |
 | `requestLogging` | `boolean \| RequestLoggingConfig` | `false` | Request logging |
 | `ipBlacklist` | `string[]` | `[]` | Blocked IP addresses |
+| `noSqlInjection` | `boolean \| NoSqlConfig` | `false` | Reject/strip `$`-operator keys |
+| `parameterPollution` | `boolean \| ParameterPollutionConfig` | `false` | Collapse repeated query params |
+| `safeErrors` | `boolean \| SafeErrorsConfig` | `false` | Generic error responses |
 | `doctor` | `boolean \| { logger }` | `true` | Startup report (silent when `NODE_ENV=test`) |
 
 Every option accepts `true` for sensible defaults, or an object for custom configuration.
@@ -265,6 +268,33 @@ app.use(backendGuard({
   xss: { body: true, query: false, params: false }
 }));
 ```
+
+### Input hardening
+
+```ts
+backendGuard({
+  noSqlInjection: true,                       // 400 on { "$ne": null } style payloads (body + query)
+  // noSqlInjection: { mode: "strip" },       // or silently drop the operator keys
+  parameterPollution: { whitelist: ["tags"] }, // ?role=a&role=b → "b" (tags stays an array)
+});
+```
+
+- `noSqlInjection` flags keys that start with `$` or look like `a[$ne]`; `dots: true` also flags `a.b` keys. Prefer `"reject"` (default) so attacks are visible.
+- `parameterPollution` keeps one value (`keep: "last" | "first"`) for repeated query parameters. Note `?a[]=1&a[]=2` is indistinguishable from `?a=1&a=2` for some parsers — whitelist parameters that must be arrays.
+- Both run before `xss`. Mount after `express.json()`.
+
+### Safe error responses
+
+```ts
+// Fastify: applied automatically with safeErrors: true
+await fastify.register(backendGuardFastify({ safeErrors: true }));
+
+// Express: mount AFTER your routes
+import { backendGuardErrors } from "backend-guard/express";
+app.use(backendGuardErrors({ logger: (err) => myLogger.error(err) }));
+```
+
+5xx responses become `{ "error": "Internal Server Error", "message": "Something went wrong." }`; 4xx keep their message (`expose4xx: false` hides that too). The real error goes to `logger` (default `console.error`). NestJS already hides non-HTTP exceptions by default, so no extra filter is needed.
 
 ### Request Logging
 
@@ -459,6 +489,11 @@ BackendGuardModule.forRoot(config);
 ---
 
 ## Changelog
+
+### v2.1.0
+- **Input hardening:** `noSqlInjection` (reject or strip `$`-operator keys in body/query, Express/Fastify/Nest) and `parameterPollution` (collapse repeated query params, with whitelist).
+- **Safe errors:** `safeErrors` option (Fastify automatic) and `backendGuardErrors()` for Express — no stack traces or internal messages in responses.
+- Doctor: new findings for the options above; CLI scan flags request data passed straight into MongoDB queries.
 
 ### v2.0.0
 - **Doctor:** startup report (active protections + warnings for risky config), one-time `X-Forwarded-For`/`trust proxy` warning, `analyzeOptions()` API and `npx backend-guard doctor` project scanner.

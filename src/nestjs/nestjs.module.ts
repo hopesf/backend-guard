@@ -9,6 +9,7 @@ import type { BackendGuardOptions } from "../types";
 import { BACKEND_GUARD_OPTIONS } from "./nestjs.constants";
 import { IpBlacklistGuard } from "./guards/ip-blacklist.guard";
 import { RateLimitGuard } from "./guards/rate-limit.guard";
+import { InputHardeningInterceptor } from "./interceptors/input-hardening.interceptor";
 import { XssInterceptor } from "./interceptors/xss.interceptor";
 import { RequestLoggingInterceptor } from "./interceptors/request-logger.interceptor";
 import { validateOptions } from "../core/options";
@@ -37,6 +38,7 @@ function resolveHelmetOptions(
  * - cors            → NestJS middleware (cors)                 Express adapter only
  * - rateLimit       → RateLimitGuard APP_GUARD (in-memory)    adapter-agnostic
  * - ipBlacklist     → IpBlacklistGuard APP_GUARD              adapter-agnostic
+ * - noSqlInjection / parameterPollution → InputHardeningInterceptor
  * - xss             → XssInterceptor APP_INTERCEPTOR          adapter-agnostic
  * - requestLogging  → RequestLoggingInterceptor               adapter-agnostic
  *
@@ -93,6 +95,12 @@ export class BackendGuardModule implements NestModule {
     if (options.ipBlacklist && options.ipBlacklist.length > 0) {
       providers.push(IpBlacklistGuard);
       providers.push({ provide: APP_GUARD, useExisting: IpBlacklistGuard });
+    }
+
+    // ── Parameter pollution + NoSQL operator checks (before XSS) ─────────────
+    if (options.parameterPollution || options.noSqlInjection) {
+      providers.push(InputHardeningInterceptor);
+      providers.push({ provide: APP_INTERCEPTOR, useExisting: InputHardeningInterceptor });
     }
 
     // ── XSS protection via Interceptor ───────────────────────────────────────

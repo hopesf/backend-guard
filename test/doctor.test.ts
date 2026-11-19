@@ -29,6 +29,15 @@ describe("analyzeOptions", () => {
   });
 });
 
+describe("input hardening findings", () => {
+  it("notes protections that are off and misconfigurations", () => {
+    expect(ids({})).toEqual(expect.arrayContaining(["nosql-off", "hpp-off"]));
+    expect(ids({ noSqlInjection: true, parameterPollution: true })).not.toEqual(expect.arrayContaining(["nosql-off", "hpp-off"]));
+    expect(ids({ noSqlInjection: { body: false, query: false } })).toContain("nosql-noop");
+    expect(ids({ noSqlInjection: { mode: "strip" } })).toContain("nosql-strip");
+  });
+});
+
 describe("startup report", () => {
   const env = process.env.NODE_ENV;
   afterEach(() => { process.env.NODE_ENV = env; });

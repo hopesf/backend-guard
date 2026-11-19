@@ -47,6 +47,47 @@ export interface RequestLoggingConfig {
 }
 
 /**
+ * NoSQL operator injection protection (e.g. `{ "email": { "$ne": null } }`).
+ * Checks req.body and req.query for keys that start with `$`.
+ */
+export interface NoSqlConfig {
+  /**
+   * - `"reject"` (default) → respond 400 when an operator key is found
+   * - `"strip"` → silently remove the offending keys
+   */
+  mode?: "reject" | "strip";
+  /** Check req.body? Default: true */
+  body?: boolean;
+  /** Check req.query? Default: true */
+  query?: boolean;
+  /** Also treat keys containing "." as operators (Mongo path injection). Default: false */
+  dots?: boolean;
+}
+
+/**
+ * HTTP parameter pollution protection for the query string.
+ * `?role=user&role=admin` arrives as an array; unless whitelisted, only one value is kept.
+ */
+export interface ParameterPollutionConfig {
+  /** Query parameters that legitimately accept several values (kept as arrays). */
+  whitelist?: string[];
+  /** Which value to keep for non-whitelisted repeated parameters. Default: "last" */
+  keep?: "first" | "last";
+}
+
+/**
+ * Safe error responses: no stack traces or internal messages to clients.
+ * Fastify: applied automatically. Express: mount `backendGuardErrors(options)` after your routes.
+ * (NestJS already hides non-HTTP exceptions by default.)
+ */
+export interface SafeErrorsConfig {
+  /** Keep `err.message` for 4xx errors (client errors). Default: true. 5xx are always generic. */
+  expose4xx?: boolean;
+  /** Called with the real error so it can be logged server-side. Default: console.error */
+  logger?: (error: unknown) => void;
+}
+
+/**
  * Startup report ("doctor") configuration.
  * By default backend-guard prints a one-time summary of what is enabled plus
  * warnings about risky configuration. It is silent when NODE_ENV is "test".
@@ -115,6 +156,15 @@ export interface BackendGuardOptions {
    * IP blacklist — requests from these IPs will be rejected with 403.
    */
   ipBlacklist?: string[];
+
+  /** NoSQL operator injection protection (`$ne`, `$gt`, ...). `true` → reject with 400. */
+  noSqlInjection?: boolean | NoSqlConfig;
+
+  /** HTTP parameter pollution protection for the query string. */
+  parameterPollution?: boolean | ParameterPollutionConfig;
+
+  /** Generic error responses (no stack traces / internals). */
+  safeErrors?: boolean | SafeErrorsConfig;
 
   /**
    * Startup report. `false` disables it; an object customizes the logger.
