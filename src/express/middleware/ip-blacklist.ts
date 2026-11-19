@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction, RequestHandler } from "express";
-import { buildIpSet, normalizeIp } from "../../shared/ip";
+import { buildIpSet, normalizeIp } from "../../core/ip";
 
 /**
  * Creates the IP blacklist middleware.

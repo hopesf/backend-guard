@@ -6,7 +6,7 @@ import {
   Injectable,
 } from "@nestjs/common";
 
-import { buildIpSet, normalizeIp } from "../../shared/ip";
+import { buildIpSet, normalizeIp } from "../../core/ip";
 import type { BackendGuardOptions } from "../../types";
 import { BACKEND_GUARD_OPTIONS } from "../nestjs.constants";
 

@@ -7,9 +7,10 @@ import {
 } from "@nestjs/common";
 import { Observable } from "rxjs";
 
-import type { BackendGuardOptions, XssConfig } from "../../types";
+import type { BackendGuardOptions } from "../../types";
+import { resolveXss } from "../../core/options";
 import { BACKEND_GUARD_OPTIONS } from "../nestjs.constants";
-import { sanitize } from "../../shared/sanitize";
+import { sanitize } from "../../core/sanitize";
 
 /**
  * Interceptor that sanitizes req.body, req.query and req.params against XSS.
@@ -23,16 +24,13 @@ import { sanitize } from "../../shared/sanitize";
  */
 @Injectable()
 export class XssInterceptor implements NestInterceptor {
-  private readonly config: XssConfig;
+  private readonly config: ReturnType<typeof resolveXss> & object;
 
   constructor(
     @Inject(BACKEND_GUARD_OPTIONS)
     options: BackendGuardOptions,
   ) {
-    this.config =
-      options.xss === true
-        ? { body: true, query: true, params: true }
-        : ((options.xss as XssConfig) ?? {});
+    this.config = resolveXss(options.xss ?? true)!;
   }
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
@@ -40,7 +38,7 @@ export class XssInterceptor implements NestInterceptor {
       .switchToHttp()
       .getRequest<Record<string, unknown>>();
 
-    if (this.config.body !== false && req["body"]) {
+    if (this.config.body && req["body"]) {
       req["body"] = sanitize(req["body"]);
     }
 
@@ -48,7 +46,7 @@ export class XssInterceptor implements NestInterceptor {
     // every access — mutating the returned object has no effect on future reads.
     // We shadow the prototype getter at the instance level using defineProperty
     // so that subsequent @Query() calls receive the sanitized copy.
-    if (this.config.query !== false && req["query"]) {
+    if (this.config.query && req["query"]) {
       const sanitizedQuery = sanitize(req["query"]) as Record<string, unknown>;
       Object.defineProperty(req, "query", {
         value: sanitizedQuery,
@@ -59,7 +57,7 @@ export class XssInterceptor implements NestInterceptor {
     }
 
     // Same technique for params (usually a plain object, but be consistent)
-    if (this.config.params !== false && req["params"]) {
+    if (this.config.params && req["params"]) {
       const sanitizedParams = sanitize(req["params"]) as Record<string, unknown>;
       Object.defineProperty(req, "params", {
         value: sanitizedParams,

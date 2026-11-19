@@ -65,10 +65,10 @@ describe("RateLimitGuard memory", () => {
   it("sweeps expired records", async () => {
     const guard = new RateLimitGuard({ rateLimit: { limit: 5, windowMs: 20 } });
     const ctx = (ip: string) => ({ switchToHttp: () => ({ getRequest: () => ({ ip }) }) }) as never;
-    for (let i = 0; i < 200; i++) guard.canActivate(ctx(`10.0.0.${i}`));
+    for (let i = 0; i < 200; i++) await guard.canActivate(ctx(`10.0.0.${i}`));
     expect(guard.size).toBe(200);
     await new Promise((r) => setTimeout(r, 40));
-    guard.canActivate(ctx("9.9.9.9"));
+    await guard.canActivate(ctx("9.9.9.9"));
     expect(guard.size).toBe(1);
   });
 });

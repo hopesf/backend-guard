@@ -11,6 +11,8 @@ import { createRateLimitMiddleware } from "./middleware/rate-limit";
 import { createXssMiddleware } from "./middleware/xss";
 import { createRequestLoggingMiddleware } from "./middleware/request-logger";
 import { createIpBlacklistMiddleware } from "./middleware/ip-blacklist";
+import { validateOptions } from "../core/options";
+import { createProxyWatcher, reportAtStartup } from "../core/doctor";
 
 /**
  * Backend Guard — All-in-one security middleware for Express.js.
@@ -46,7 +48,19 @@ import { createIpBlacklistMiddleware } from "./middleware/ip-blacklist";
  * ```
  */
 export function backendGuard(options: BackendGuardOptions = {}): RequestHandler {
+  validateOptions(options);
+  reportAtStartup(options);
+
   const router = Router();
+
+  // Warn once if X-Forwarded-For shows up while "trust proxy" is off
+  const watchProxy = createProxyWatcher(options);
+  if (options.rateLimit || options.ipBlacklist?.length) {
+    router.use((req, _res, next) => {
+      watchProxy(Boolean(req.headers["x-forwarded-for"]), Boolean(req.app?.get("trust proxy")));
+      next();
+    });
+  }
 
   // Order matters!
   // 1. IP blacklist first — reject blocked IPs immediately

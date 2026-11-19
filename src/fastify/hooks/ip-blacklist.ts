@@ -1,5 +1,5 @@
 import type { FastifyRequest, FastifyReply } from "fastify";
-import { buildIpSet, normalizeIp } from "../../shared/ip";
+import { buildIpSet, normalizeIp } from "../../core/ip";
 
 /**
  * Creates a Fastify onRequest hook for IP blacklist checking.

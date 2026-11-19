@@ -7,6 +7,9 @@ import type { HelmetOptions } from "helmet";
 import { createIpBlacklistHook } from "./hooks/ip-blacklist";
 import { createXssHook } from "./hooks/xss";
 import { createRequestLoggingHook } from "./hooks/request-logger";
+import { resolveRateLimit } from "../core/options";
+import { validateOptions } from "../core/options";
+import { createProxyWatcher, reportAtStartup } from "../core/doctor";
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 function requireOptional(mod: unknown, name: string): unknown {
@@ -41,18 +44,14 @@ function getDefault(mod: unknown): unknown {
  * - limit    → max
  */
 function buildRateLimitOpts(option: true | RateLimitConfig) {
-  if (option === true) {
-    return { timeWindow: 15 * 60 * 1000, max: 100 };
-  }
+  const c = resolveRateLimit(option)!;
   return {
-    timeWindow: option.windowMs ?? 15 * 60 * 1000,
-    max: option.limit ?? 100,
-    ...(option.message && {
-      errorResponseBuilder: () => ({
-        statusCode: option.statusCode ?? 429,
-        error: "Too Many Requests",
-        message: option.message,
-      }),
+    timeWindow: c.windowMs,
+    max: c.limit,
+    errorResponseBuilder: () => ({
+      statusCode: c.statusCode,
+      error: "Too Many Requests",
+      message: c.message,
     }),
   };
 }
@@ -107,7 +106,20 @@ function buildCorsOpts(option: true | string[] | CorsOptions) {
  * ```
  */
 export function backendGuardFastify(options: BackendGuardOptions = {}): FastifyPluginAsync {
+  validateOptions(options);
+  const watchProxy = createProxyWatcher(options);
+
   const plugin: FastifyPluginAsync = async (fastify) => {
+    reportAtStartup(options);
+
+    // Warn once if X-Forwarded-For shows up while trustProxy is off
+    if (options.rateLimit || options.ipBlacklist?.length) {
+      fastify.addHook("onRequest", async (request) => {
+        const cfg = (request.server as unknown as { initialConfig?: { trustProxy?: unknown } }).initialConfig;
+        watchProxy(Boolean(request.headers["x-forwarded-for"]), Boolean(cfg?.trustProxy));
+      });
+    }
+
     // Order matters — same reasoning as the Express version:
 
     // 1. IP blacklist first — reject blocked IPs with zero further processing

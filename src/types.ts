@@ -37,6 +37,23 @@ export interface RequestLoggingConfig {
   fields?: Array<"method" | "url" | "ip" | "statusCode" | "responseTime">;
   /** Custom log function. Default: console.log */
   logger?: (message: string) => void;
+  /**
+   * Mask sensitive query-string values (token, password, api_key, ...) in the logged URL.
+   * - `true` (default) → built-in list of sensitive parameter names
+   * - `string[]` → your own list (case-insensitive) in addition to the built-in list
+   * - `false` → log URLs untouched (not recommended)
+   */
+  redactQuery?: boolean | string[];
+}
+
+/**
+ * Startup report ("doctor") configuration.
+ * By default backend-guard prints a one-time summary of what is enabled plus
+ * warnings about risky configuration. It is silent when NODE_ENV is "test".
+ */
+export interface DoctorConfig {
+  /** Custom log function for the report. Default: console.log / console.warn */
+  logger?: (message: string) => void;
 }
 
 /**
@@ -98,4 +115,10 @@ export interface BackendGuardOptions {
    * IP blacklist — requests from these IPs will be rejected with 403.
    */
   ipBlacklist?: string[];
+
+  /**
+   * Startup report. `false` disables it; an object customizes the logger.
+   * Default: enabled (silent when NODE_ENV === "test").
+   */
+  doctor?: boolean | DoctorConfig;
 }

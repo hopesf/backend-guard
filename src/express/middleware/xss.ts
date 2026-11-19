@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction, RequestHandler } from "express";
-import type { BackendGuardOptions, XssConfig } from "../../types";
-import { sanitize } from "../../shared/sanitize";
+import type { BackendGuardOptions } from "../../types";
+import { resolveXss } from "../../core/options";
+import { sanitize } from "../../core/sanitize";
 
 /**
  * Creates the XSS sanitization middleware.
@@ -20,15 +21,14 @@ import { sanitize } from "../../shared/sanitize";
 export function createXssMiddleware(
   option: BackendGuardOptions["xss"]
 ): RequestHandler {
-  const config: XssConfig =
-    option === true ? { body: true, query: true, params: true } : (option as XssConfig);
+  const config = resolveXss(option ?? true)!;
 
   return (req: Request, _res: Response, next: NextFunction): void => {
-    if (config.body !== false && req.body) {
+    if (config.body && req.body) {
       req.body = sanitize(req.body);
     }
 
-    if (config.query !== false && req.query) {
+    if (config.query && req.query) {
       Object.defineProperty(req, "query", {
         value: sanitize(req.query),
         configurable: true,
@@ -37,7 +37,7 @@ export function createXssMiddleware(
       });
     }
 
-    if (config.params !== false) {
+    if (config.params) {
       let current: unknown = sanitize(req.params ?? {});
       Object.defineProperty(req, "params", {
         configurable: true,

@@ -1,6 +1,6 @@
 # 🛡️ Backend Guard
 
-All-in-one security middleware for **Express.js**, **Fastify**, and **NestJS**. One config for headers, CORS, rate limiting, XSS sanitization, request logging and IP blocking.
+All-in-one security middleware for **Express.js**, **Fastify**, and **NestJS**. Secure-by-default protection for Express, Fastify and NestJS — one config for headers, CORS, rate limiting, XSS sanitization, safe request logging and IP blocking, plus a **doctor** that tells you when your setup is risky.
 
 [![npm version](https://img.shields.io/npm/v/backend-guard.svg)](https://www.npmjs.com/package/backend-guard)
 [![npm downloads](https://img.shields.io/npm/dw/backend-guard.svg)](https://www.npmjs.com/package/backend-guard)
@@ -148,13 +148,45 @@ npm install @nestjs/platform-express
 
 Each entry loads only its own framework, so installing one framework never requires the others.
 
+## Doctor — know when your setup is risky
+
+**Startup report.** On startup backend-guard prints what is active and warns about risky or ineffective configuration:
+
+```
+[backend-guard] active: cors(1 origins), rate-limit(100/900s), blacklist(1)
+[backend-guard] WARN headers-off: Security headers (helmet) are disabled. → Set `protectHeaders: true`.
+[backend-guard] WARN cors-origin-no-scheme: CORS origin "example.com" has no scheme, so it will never match ...
+[backend-guard] WARN blacklist-cidr: ipBlacklist entry "10.0.0.0/8" looks like a CIDR range; only exact IPs are supported ...
+```
+
+It also warns once at runtime when requests carry `X-Forwarded-For` but `trust proxy` is off. Silence it with `doctor: false` (it is always silent when `NODE_ENV=test`), or route it with `doctor: { logger }`.
+
+Invalid config fails fast: unknown options (typos such as `rateLimt`), wrong types and out-of-range values throw a `BackendGuardConfigError` listing every problem.
+
+**Programmatic use**
+
+```ts
+import { analyzeOptions } from "backend-guard";
+const findings = analyzeOptions({ cors: true }); // [{ id, severity, message, fix }]
+```
+
+**CLI — static project scan**
+
+```bash
+npx backend-guard doctor [path] [--json] [--strict]
+```
+
+A heuristic checklist (not a verdict): wildcard CORS (and CORS + credentials), stack traces sent to clients, cookies/sessions without `secure`/`httpOnly`, disabled TLS verification, possible hardcoded secrets, `.env` not in `.gitignore`, missing helmet, deprecated `xss-clean`/`csurf`. Exit code is 1 on errors (and on warnings with `--strict`), so it fits CI.
+
+---
+
 ## Security notes (read this)
 
 - **Behind a proxy?** Set `trust proxy` (Express/Nest) or `trustProxy` (Fastify) correctly. Without it every client shares the proxy's IP (rate limit and blacklist break); with a too-permissive value clients can spoof `X-Forwarded-For` and evade both.
 - **`xss` is input sanitization**, not a substitute for context-aware output encoding. It cleans HTML in strings, so fields that legitimately contain `<`/`>` (e.g. passwords) may be altered; scope it with `xss: { body: false, ... }` or per-route use if needed. Mount it **after** `express.json()`.
 - **Rate limiting is per process** (in memory). For several instances use a shared store (e.g. Redis via `express-rate-limit` stores, `@fastify/rate-limit` `redis` option).
 - **IP blacklist** matches exact addresses (IPv4-mapped IPv6 such as `::ffff:1.2.3.4` is normalized). CIDR ranges are not supported yet.
-- **Request logging** prints the full URL including the query string; do not put secrets in query strings, or supply your own `logger` that redacts them.
+- **Request logging** masks sensitive query values (`token`, `password`, `api_key`, ...) as `[REDACTED]`; extend the list with `redactQuery: ["myParam"]`. Still avoid secrets in URLs.
 
 ---
 
@@ -170,6 +202,7 @@ Both `backendGuard()` (Express) and `backendGuardFastify()` (Fastify) accept the
 | `xss` | `boolean \| XssConfig` | `false` | XSS sanitization |
 | `requestLogging` | `boolean \| RequestLoggingConfig` | `false` | Request logging |
 | `ipBlacklist` | `string[]` | `[]` | Blocked IP addresses |
+| `doctor` | `boolean \| { logger }` | `true` | Startup report (silent when `NODE_ENV=test`) |
 
 Every option accepts `true` for sensible defaults, or an object for custom configuration.
 
@@ -426,6 +459,13 @@ BackendGuardModule.forRoot(config);
 ---
 
 ## Changelog
+
+### v2.0.0
+- **Doctor:** startup report (active protections + warnings for risky config), one-time `X-Forwarded-For`/`trust proxy` warning, `analyzeOptions()` API and `npx backend-guard doctor` project scanner.
+- **Breaking:** configuration is validated up front — unknown options (typos) and invalid values now throw `BackendGuardConfigError`.
+- **Breaking:** request logs mask sensitive query-string values by default (`redactQuery`).
+- New framework-agnostic `core` (shared config resolution, IP handling, sanitizer, logger, `RateLimiter` with pluggable store), also exported as `backend-guard/core`. Nest's `RateLimitGuard` now runs on it.
+- Fastify rate-limit now always returns the configured status code/message.
 
 ### v1.4.0
 - **Fix:** `require("backend-guard")` no longer crashes when optional Fastify/Nest peers are not installed. **Breaking:** Fastify and NestJS exports moved to `backend-guard/fastify` and `backend-guard/nestjs`.

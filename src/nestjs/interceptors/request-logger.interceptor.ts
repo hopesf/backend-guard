@@ -8,7 +8,10 @@ import {
 import { Observable } from "rxjs";
 import { tap } from "rxjs/operators";
 
-import type { BackendGuardOptions, RequestLoggingConfig } from "../../types";
+import type { BackendGuardOptions } from "../../types";
+import { resolveLogging } from "../../core/options";
+import type { ResolvedLogging } from "../../core/options";
+import { formatLogLine } from "../../core/logger";
 import { BACKEND_GUARD_OPTIONS } from "../nestjs.constants";
 
 type HttpRequest = {
@@ -35,31 +38,13 @@ type HttpResponse = {
  */
 @Injectable()
 export class RequestLoggingInterceptor implements NestInterceptor {
-  private readonly config: RequestLoggingConfig;
+  private readonly config: ResolvedLogging;
 
   constructor(
     @Inject(BACKEND_GUARD_OPTIONS)
     options: BackendGuardOptions,
   ) {
-    const defaultFields: RequestLoggingConfig["fields"] = [
-      "method",
-      "url",
-      "ip",
-      "statusCode",
-      "responseTime",
-    ];
-
-    this.config =
-      options.requestLogging === true
-        ? { fields: defaultFields, logger: console.log }
-        : {
-            fields:
-              (options.requestLogging as RequestLoggingConfig)?.fields ??
-              defaultFields,
-            logger:
-              (options.requestLogging as RequestLoggingConfig)?.logger ??
-              console.log,
-          };
+    this.config = resolveLogging(options.requestLogging ?? true)!;
   }
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
@@ -80,15 +65,14 @@ export class RequestLoggingInterceptor implements NestInterceptor {
     statusCode: number,
     duration: number,
   ): void {
-    const parts: string[] = [];
-    const fields = this.config.fields!;
-
-    if (fields.includes("method")) parts.push(req.method);
-    if (fields.includes("url")) parts.push(req.originalUrl ?? req.url);
-    if (fields.includes("ip")) parts.push(req.ip ?? "unknown");
-    if (fields.includes("statusCode")) parts.push(String(statusCode));
-    if (fields.includes("responseTime")) parts.push(`${duration}ms`);
-
-    this.config.logger!(`[backend-guard] ${parts.join(" | ")}`);
+    this.config.logger(
+      formatLogLine(this.config, {
+        method: req.method,
+        url: req.originalUrl ?? req.url,
+        ip: req.ip,
+        statusCode,
+        responseTimeMs: duration,
+      }),
+    );
   }
 }

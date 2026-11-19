@@ -1,21 +1,24 @@
 {
   "name": "backend-guard",
-  "version": "1.4.0",
-  "description": "All-in-one security middleware for Express.js, Fastify and NestJS — helmet, cors, rate-limit, XSS protection, request logging & IP blacklist in a single config.",
+  "version": "2.0.0",
+  "description": "Secure-by-default security layer for Express, Fastify and NestJS — headers, CORS, rate limit, XSS sanitization, safe request logging, IP blacklist, plus a startup doctor that flags risky configuration.",
   "keywords": [
-    "express",
-    "security",
-    "middleware",
-    "helmet",
-    "cors",
-    "rate-limit",
-    "xss",
-    "ip-blacklist",
-    "request-logging",
     "backend-security",
+    "cors",
+    "doctor",
+    "express",
+    "hardening",
+    "helmet",
+    "ip-blacklist",
+    "middleware",
     "nestjs",
     "nestjs-module",
-    "nestjs-security"
+    "nestjs-security",
+    "rate-limit",
+    "request-logging",
+    "security",
+    "security-audit",
+    "xss"
   ],
   "homepage": "https://github.com/hopesf/backend-guard#readme",
   "bugs": {
@@ -129,7 +132,11 @@
       "types": "./dist/nestjs/index.d.ts",
       "default": "./dist/nestjs/index.js"
     },
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./core": {
+      "types": "./dist/core/index.d.ts",
+      "default": "./dist/core/index.js"
+    }
   },
   "typesVersions": {
     "*": {
@@ -141,7 +148,13 @@
       ],
       "nestjs": [
         "dist/nestjs/index.d.ts"
+      ],
+      "core": [
+        "dist/core/index.d.ts"
       ]
     }
+  },
+  "bin": {
+    "backend-guard": "dist/cli/index.js"
   }
 }

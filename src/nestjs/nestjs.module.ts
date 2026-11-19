@@ -11,6 +11,8 @@ import { IpBlacklistGuard } from "./guards/ip-blacklist.guard";
 import { RateLimitGuard } from "./guards/rate-limit.guard";
 import { XssInterceptor } from "./interceptors/xss.interceptor";
 import { RequestLoggingInterceptor } from "./interceptors/request-logger.interceptor";
+import { validateOptions } from "../core/options";
+import { createProxyWatcher, reportAtStartup } from "../core/doctor";
 
 function resolveCorsOptions(option: BackendGuardOptions["cors"]): CorsOptions {
   if (option === true) return {};
@@ -71,6 +73,9 @@ export class BackendGuardModule implements NestModule {
   ) {}
 
   static forRoot(options: BackendGuardOptions = {}): DynamicModule {
+    validateOptions(options);
+    reportAtStartup(options);
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const providers: any[] = [
       { provide: BACKEND_GUARD_OPTIONS, useValue: options },
@@ -123,6 +128,17 @@ export class BackendGuardModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const middlewares: any[] = [];
+
+    // Warn once if X-Forwarded-For shows up while "trust proxy" is off
+    if (this.options.rateLimit || this.options.ipBlacklist?.length) {
+      const watchProxy = createProxyWatcher(this.options);
+      middlewares.push(
+        (req: { headers: Record<string, unknown>; app?: { get(k: string): unknown } }, _res: unknown, next: () => void) => {
+          watchProxy(Boolean(req.headers["x-forwarded-for"]), Boolean(req.app?.get("trust proxy")));
+          next();
+        },
+      );
+    }
 
     // Order matches the Express integration:
     // 1. Security headers first

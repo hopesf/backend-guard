@@ -14,10 +14,13 @@ try {
   fs.writeFileSync(path.join(tmp, "package.json"), '{"name":"t","version":"1.0.0"}');
   run(`npm i --no-audit --no-fund express "${path.join(tmp, tgz)}"`, tmp);
   const out = run(
-    `node -e "const m=require('backend-guard');const e=require('backend-guard/express');if(typeof m.backendGuard!=='function'||typeof e.backendGuard!=='function')process.exit(1);console.log('ok')"`,
+    `node -e "const m=require('backend-guard');const e=require('backend-guard/express');const c=require('backend-guard/core');if(typeof m.backendGuard!=='function'||typeof e.backendGuard!=='function'||typeof c.analyzeOptions!=='function')process.exit(1);console.log('ok')"`,
     tmp
   );
   if (out !== "ok") throw new Error("unexpected output: " + out);
+  // the CLI must be installed as a bin and run
+  const cli = execSync("npx backend-guard doctor . --json", { cwd: tmp, stdio: "pipe" }).toString();
+  JSON.parse(cli);
   console.log("pack-check: OK (express-only install loads without optional peers)");
 } catch (err) {
   console.error("pack-check FAILED:", err.stderr ? err.stderr.toString() : err);

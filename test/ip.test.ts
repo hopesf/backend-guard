@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { normalizeIp } from "../src/shared/ip";
+import { normalizeIp } from "../src/core/ip";
 
 describe("normalizeIp", () => {
   it("unwraps IPv4-mapped IPv6", () => {
